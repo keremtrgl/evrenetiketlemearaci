@@ -1,13 +1,18 @@
 {
   "manifest_version": 3,
-  "name": "Evren Etiketleme Yardımcısı",
-  "version": "0.2.1",
+  "name": "Kerem · Yerel Etiketleme",
+  "version": "0.3.0",
   "author": "Kerem | GitHub: https://github.com/keremtrgl | Hugging Face: https://huggingface.co/KeremTT",
   "homepage_url": "https://github.com/keremtrgl/evrenetiketlemearaci",
-  "description": "Evren'in görünen etiketleme düğmelerini sıralı çalıştırır. Başlat/Durdur ve kayıt doğrulaması içerir.",
+  "description": "Tarayıcıda yerel nesne tespiti, kutu/poligon düzenleme ve ONNX tür önerisi. Evren çıkarım API'sini çağırmaz.",
+  "permissions": ["activeTab"],
+  "host_permissions": ["https://huggingface.co/*", "https://*.huggingface.co/*", "https://*.hf.co/*"],
+  "background": {"service_worker": "background.js"},
+  "action": {"default_title": "Yerel etiketleme atölyesini aç"},
+  "content_security_policy": {"extension_pages": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; object-src 'none'; connect-src 'self' https://huggingface.co https://*.huggingface.co https://*.hf.co; img-src 'self' data: blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'"},
   "content_scripts": [{
     "matches": ["https://evren.ssyz.org.tr/*"],
-    "js": ["flow.js", "content.js"],
+    "js": ["site.js"],
     "run_at": "document_idle"
   }]
 }

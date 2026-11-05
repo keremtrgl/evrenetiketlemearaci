@@ -1,108 +1,135 @@
-# Evren Etiketleme Aracı
+# Kerem · Yerel Etiketleme
 
-[Kerem](https://github.com/keremtrgl) · [Hugging Face](https://huggingface.co/KeremTT) · Sürüm 0.2.1
+[GitHub](https://github.com/keremtrgl) · [Hugging Face](https://huggingface.co/KeremTT) · v0.3.0
 
-Evren'de görselleri tek tek açıp aynı düğmelere basmak yerine, etiketleme adımlarını sırayla çalıştıran bir Chrome uzantısı.
+Görselleri kendi bilgisayarında analiz edip kutu ve poligon etiketleri hazırlayabileceğin Chrome uzantısı. Model tarayıcıda çalışır. Görseller çıkarım için bir sunucuya gönderilmez.
 
-Araç, sitenin **AI Meta Oluştur → Otomatik Etiketle → Onayla ve Etiketle → Sonraki** akışını kullanır. Mevcut AI Meta varsa tekrar oluşturmaz. Görselleri bilgisayarınıza indirmez ve ayrı bir API anahtarı istemez.
+**Bu sürüm Evren’in otomatik etiketleme düğmesine basmaz, SAM veya LLM API çağrısı yapmaz. API anahtarı istemez.** Önceki sürümdeki site otomasyonu kaldırıldı; otomatik etiketleme işleminin kredi tükettiği görüldü.
 
-Bu sürüm geliştirme aşamasında. Önce birkaç görselle deneyin ve çıkan etiketlere bakın. Uzantı, modelin çizdiği sınırların veya seçtiği sınıfların doğru olduğunu kendi başına denetlemiyor.
+## Neler yapabiliyor?
+
+- Yerel modelle genel nesneler için kutu önerileri üretir.
+- Kutu çizmeyi, taşımayı, iki köşesinden boyutlandırmayı ve poligon çizmeyi destekler.
+- Etiket sınıfını değiştirebilir, geri alabilir ve incelendi olarak işaretleyebilirsin.
+- Aynı sekmede en fazla 200 görsellik sırayı tek tek analiz edebilir. Mevcut etiketi olanları toplu analizde korur.
+- Etiket taslaklarını tarayıcıda saklar. Fotoğrafları saklamaz; aynı dosyayı yeniden açınca taslağı geri getirir.
+- YOLO kutu, YOLO poligon, COCO JSON ve proje JSON çıktısı verir.
+- Uygun YOLO sınıflandırma ONNX modelini yükleyip tür önerisi alabilirsin.
+
+Yerel model, **Xenova/yolos-tiny**. Araba, insan, kuş, kedi gibi genel sınıfları tanır. Bütün canlı türlerini tanıyan veya segmentasyon maskesi üreten bir model değildir. Model puanı da doğruluk garantisi sayılmaz.
 
 ## Kurulum
 
-Bilgisayarınızda Google Chrome bulunması yeterli. Uzantıyı kullanmak için Node.js kurmanız veya terminal açmanız gerekmiyor.
+1. [Releases](https://github.com/keremtrgl/evrenetiketlemearaci/releases) bölümünden **evren-etiketleme-araci-v0.3.0.zip** paketini indir.
+2. ZIP’e sağ tıkla, **Tümünü ayıkla** de.
+3. Chrome adres çubuğuna `chrome://extensions` yaz.
+4. **Geliştirici modu**nu aç.
+5. **Paketlenmemiş öğe yükle** düğmesinden `manifest.json` dosyasının bulunduğu klasörü seç.
+6. Araç çubuğundaki uzantılar menüsünden **Kerem · Yerel Etiketleme** simgesine tıkla. Atölye ayrı sekmede açılır.
 
-1. Bu sayfanın üstündeki yeşil **Code** düğmesine, ardından **Download ZIP** seçeneğine basın.
-2. İnen ZIP dosyasına sağ tıklayıp **Tümünü ayıkla** seçeneğini kullanın.
-3. Çıkan klasörü açın. İçinde `manifest.json`, `content.js` ve `flow.js` dosyalarını görmelisiniz. Bir klasör daha varsa onun içine girin.
-4. Chrome adres çubuğuna `chrome://extensions` yazıp Enter'a basın.
-5. Sağ üstteki **Geliştirici modu** anahtarını açın.
-6. **Paketlenmemiş öğe yükle** düğmesine basın.
-7. Üçüncü adımda bulduğunuz, içinde `manifest.json` olan klasörü seçin. ZIP dosyasını seçmeyin.
-8. Uzantı listesinde **Evren Etiketleme Yardımcısı** görünüyorsa kurulum tamamdır.
+Hazır ZIP’i kullanıyorsan Node.js kurmana veya terminal açmana gerek yok. GitHub’ın **Code → Download ZIP** paketi ise kaynak koddur; çalıştırmadan önce aşağıdaki geliştirme adımlarıyla derlenmelidir.
 
-Yüklediğiniz klasörü sonradan silmeyin veya taşımayın. Chrome uzantıyı o klasörden okur.
+### Eski sürümden geçiyorsan
 
-## İlk deneme
+Önce eski otomasyonu durdur. Yeni paketi ayrı bir klasöre çıkar, eski uzantıyı devre dışı bırakıp yenisini yükle. Evren sekmesini de yenile; eski sayfada yüklenmiş otomasyon kodu yalnız dosyaları değiştirince durmaz.
 
-1. [Evren](https://evren.ssyz.org.tr)'e giriş yapın.
-2. Etiketleme yetkinizin olduğu veri setini açıp **Etiketle** ekranına girin.
-3. Sayfa kurulumdan önce açıksa yenileyin. Kaydedilmemiş çiziminiz varsa önce kaydedin.
-4. Sağ alttaki **Etiketleme yardımcısı** panelinde çalışma sınırını **1**, hızı **1 görsel/dakika** yapın.
-5. **Başlat** düğmesine basın. İşlem günlüğünden hangi adımda olduğunu takip edebilirsiniz.
-6. Sonraki görsele geçtiğinde önceki görseli açıp sınıfları ve çizimleri kontrol edin.
+v0.2.x panelindeki çalışma notları bu atölyeye taşınmaz. Evren’de kaydedilmiş etiketler değiştirilmez.
 
-Yeni sınıf önerileri çıkarsa ve ilgili izin kapalıysa o görsel onaylanmadan ertelenir. Önerilere bakıp veri setinize uygun olup olmadığına karar verebilirsiniz.
+## İlk kullanım
 
-## Ayarlar ne işe yarıyor?
+**Görsel aç** ile bilgisayarındaki görseli seç veya sayfaya sürükle. **Görseli analiz et** düğmesine bas. İlk kullanımda model dosyaları Hugging Face’den indirilir ve tarayıcı önbelleğine alınır. İnternet bağlantısı ve yerel işlemci kullanılır; Evren kredisi kullanılmaz.
 
-| Ayar | Açıklama |
+Kutular çıkınca sınırları ve sınıf adlarını kontrol et. İşaretlediğin etiketleri **incelendi** kutusuyla onaylayabilirsin. Varsayılan dışa aktarım yalnız incelenmiş etiketleri içerir.
+
+**Sırayı analiz et** açık görselleri sırayla işler. Mevcut etiketi olan görselleri atlar. **Durdur** yerel motoru kapatır; yeni işlem başlatılmaz. Yerel ONNX modelini de bellekten çıkardığı için tekrar tür önerisi almadan önce yeniden yüklemek gerekir.
+
+## Evren’deki görseli almak
+
+1. Evren’in etiketleme ekranını aç.
+2. Fotoğrafın tamamını, kenarları kesilmeden tuvale sığdır.
+3. O sekmedeyken uzantı simgesine tıkla.
+4. Açılan atölyede **Evren’den al** düğmesini kullan.
+
+Bu işlem yalnız görünür görüntü tuvalini belleğe okur. Tuval tarayıcı tarafından korunuyorsa, kenarları kesilmişse veya fotoğraf katmanı güvenilir biçimde ayrılamıyorsa durur. Görseli dosyadan açabilirsin.
+
+Tuvalden alınan görüntü, orijinal dosyanın önizlemesidir. **COCO çıktısındaki piksel boyutları önizleme boyutudur.** Özgün görsele içe aktarmadan önce boyutları ve çerçeveyi doğrula. Bu sürüm Evren’e otomatik etiket yazmaz; kayıt yolunun ücret davranışı henüz doğrulanmadı.
+
+## Çizim ve düzenleme
+
+| İşlem | Kullanım |
 | --- | --- |
-| Görsel / dakika | Yeni görselleri işlemeye başlama hızının üst sınırı. 0,1 ile 60 arasında ayarlanabilir. |
-| Çalışma sınırı | İlk turda ziyaret edilecek görsel sayısı. Etiketli olduğu için atlananlar dahildir. En fazla 1.000 girilebilir. Tur sonundaki geri dönüş denemeleri bu sayıya eklenir. |
-| Yeni sınıf önerilerini de onayla | Sitenin önerdiği yeni sınıfların onaylanmasına izin verir. Başlangıçta kapalıdır. |
-| Durdur | Yeni adımların başlamasını engeller. Sunucuda zaten başlamış bir işlem tamamlanabilir. |
+| Seç / taşı | V. Etiketi seç, sürükleyerek taşı. |
+| Kutu | B. Basılı tutup sürükle. |
+| Boyutlandır | Seçili kutunun sol üst veya sağ alt köşesini sürükle. |
+| Poligon | P. Köşeleri tıkla, Enter ile bitir. |
+| Köşe düzelt | Seçili poligonun köşesini sürükle. |
+| Son köşeyi kaldır | Poligon çizerken Backspace. |
+| Çizimi iptal et | Escape. |
+| Sınıf değiştir | Etiketi seç, sağdaki adı düzenle, Uygula’ya bas. |
+| Sil | Seçili etiket için Delete veya Seçileni sil. |
+| Geri al / yinele | Ctrl+Z / Ctrl+Shift+Z veya araç çubuğu. |
 
-Örneğin hızı **2** yaparsanız görsel başlangıçları arasında en az 30 saniye bırakılır. Sitenin bir görseli etiketlemesi 50 saniye sürüyorsa bu ayar onu 30 saniyede bitiremez. Aynı anda tek görsel işlenir.
+Otomatik maske, OBB ve iskelet çıkarımı bu sürümde yok. Kutuyu poligonmuş gibi dışa aktarıp segmentasyon etiketi üretmez.
 
-**Yeni sınıflar konusunda dikkatli olun.** Site, “kuş” yerine “siyah renkli küçük kuş” veya sahneye özel başka adlar önerebilir. Bu seçeneği her görselde açık tutmak sınıf listenizi gereksiz büyütebilir. Eğitim için belirli bir sınıf listeniz varsa önerileri kontrol ederek ilerleyin.
+## Anadolu modelini kullanmak
 
-## Etiketli görsellere ne oluyor?
+Evren’deki **anadolu1000-yolo11m-cls** ve **anadolu500-yolo11m-cls** sınıflandırma modelleri. Fotoğraf veya seçili nesne için tür önerisinde kullanılabilirler; nesnenin konumunu kendileri üretmezler.
 
-Üzerinde en az bir etiketi olan görsel atlanır. Mevcut etiketler silinmez. Ancak bu, eksik etiketli bir görselin de atlanacağı anlamına gelir; bu sürüm eksik nesneleri tamamlamaz.
+Elinde bu modellerden birinin **ONNX dosyası** varsa:
 
-Yeni etiket oluşması ve sonraki görsele geçiş izlenir. Paneldeki **Tamamlanan** sayısı bu arayüz akışının tamamlandığını gösterir. Her görselin sunucuda kayıtlı içeriği ayrıca okunup doğrulanmaz; etiket kalitesi de bu sayıya dahil değildir.
+1. Sağdaki **Anadolu / kendi modelin** bölümünü aç.
+2. ONNX dosyasını seç.
+3. Eğitimde kullanılan sınıf indeks sırasıyla JSON veya satır başına bir isim içeren TXT dosyasını seç. Alfabetik sıralama yapma.
+4. Giriş boyutunu ayarla. İncelenen Anadolu1000 kartında **384** yazıyor. Kendi dışa aktarımının giriş boyutu belirleyicidir.
+5. **Modeli yükle** düğmesine bas.
+6. İstersen bir kutu seç; ardından **Tür öner** düğmesine bas. Seçili kutu yoksa tüm görsel değerlendirilir.
 
-## Bir yerde durursa
+İlk beş öneriden birine tıklarsan seçili etiketin sınıfı değişir. Etiket seçili değilse öneri yeni çizim sınıfı olur. Yanlış tür atamamak için sonucu incele.
 
-**Panel görünmüyor:** `chrome://extensions` sayfasında uzantının açık olduğunu kontrol edin. Ardından Evren'deki veri seti veya etiketleme sayfasını yenileyin.
+Örnek sınıf dosyası:
 
-**“Manifest dosyası bulunamadı” yazıyor:** Yanlış klasör seçilmiştir. `manifest.json` dosyasını doğrudan gördüğünüz klasörü yükleyin.
+```json
+["Turdus_merula", "Erithacus_rubecula"]
+```
 
-**Onay düğmesi geç açılıyor:** Araç düğmenin etkinleşmesini en fazla 30 saniye bekler. Süre dolarsa görselin sırasını ve hata nedenini erteleme listesine yazar.
+Bu yalnız biçim örneğidir; Anadolu modelinin gerçek sınıf listesi değildir. Liste ile çıktı sayısı uyuşmazsa motor reddeder. Ön işleme NCHW RGB, merkez kare kırpma ve 0–1 ölçeklemedir. Eğitimde özel dönüşüm kullandıysan uyarlanmalıdır. `.pt` dosyası tarayıcıda çalışmaz.
 
-**Yarım kalan işlemler:** Elle kilit kaldırma yoktur. Başlat dediğinizde önceki onayın sonucu kontrol edilir. Etiketler görünüyorsa tekrar onay gönderilmez. Onay gönderilmiş ama sonuç belirsizse görsel inceleme notuyla saklanır; aynı istek tekrar gönderilmez.
+Model dosyanın yoksa Evren’deki dışa aktarımın ücretini doğrulamadan dönüştürme başlatma. Uzantı senin adına model indirme veya dönüştürme işlemi başlatmaz. Özel ağırlıklar bu repoda bulunmaz.
 
-**Ertelenen görseller:** İşlem başarısız olursa mümkün olduğunda açık öneri penceresi kapatılır ve sonraki görsele geçilir. Tur sonunda sıra numarasıyla geri dönülür. Her turda bir dönüş, kayıt başına toplam en fazla iki otomatik dönüş denenir. Çözülemeyenler panelde nedenleriyle kalır. Dönüş için sitenin sıra göstergesi ve önceki görsel düğmesi gerekir; veri seti sırası değişmişse yanlış görsel etiketlenmez.
+## Dışa aktarım ve kayıt
 
-**Yeni etiket oluşmuyor:** Bekleme sonunda sonuç not edilir. Onay gönderilmişse yalnız sonuç kontrolü yapılır; otomatik olarak ikinci kez maske üretimi başlatılmaz. Sunucu hâlâ çalışıyorsa, öneri penceresi güvenli biçimde kapatılabilene kadar beklenir.
+**Proje JSON** taslakların sınıf, geometri, kaynak ve inceleme bilgisini korur. **COCO** bütün açık görselleri kapsar. YOLO çıktısı mevcut görselin etiket dosyasını ve `classes.txt` listesini indirir. Görsellerin kendisi indirilmez.
 
-Çalışırken elle başka görsele veya veri setine geçmeyin. Son görselde sonraki düğmesi olmadığında araç durabilir. Notlar aynı sekmenin oturumunda, sayfa yenilense de korunur. Sekme kapatıldıktan sonra kalıcı kuyruk ve kapalı tarayıcıda çalışma desteği yoktur. Kota, erişim engeli veya veri seti değişiminde çalışma durur.
+Model önerileri önce incelenmemiştir. Segmentasyon YOLO çıktısında yalnız gerçek poligonlar kabul edilir. Kutuların segmentasyon maskesi olduğu iddia edilmez.
 
-## Güncelleme
+Taslaklar uzantının kendi IndexedDB deposundadır. Aynı görsel dosyası SHA-256 özetiyle bulunur. Tarayıcı profilini veya uzantı verisini silersen taslaklar silinebilir; **Taslak yedeği indir** ile etiket yedeği alabilirsin. Fotoğrafları tekrar açmak için kaynak dosyalar gerekir. Model çalışırken sekmeyi kapatırsan işlem sürmez.
 
-1. Çalışmayı durdurun ve açık görseli kontrol edin.
-2. Yeni dosyaları indirip daha önce yüklediğiniz klasördeki dosyaları değiştirin.
-3. `chrome://extensions` ekranında uzantının yenile düğmesine basın.
-4. Evren sekmesini de yenileyin.
+## Kredi ve veri erişimi
 
-## Veri erişimi ve kotalar
+- Evren otomatik etiketleme, akıllı seçim, LLM ve görüntü çıkarım API’si çağrılmaz.
+- Evren sayfasında etiket eklenmez, silinmez veya kaydedilmez.
+- API anahtarı, çerez veya oturum bilgisi okunmaz.
+- Model indirme için yalnız Hugging Face alanlarına GET isteği yapılır. Görsel yükleme isteği yapılmaz.
+- ONNX dosyan ve fotoğrafların kendi tarayıcında işlenir.
+- Model indirme ve çıkarım bilgisayarının internetini, işlemcisini ve belleğini kullanır.
 
-Uzantı yalnızca `https://evren.ssyz.org.tr/` üzerinde çalışır. Kendi kodu dış servise veri göndermez, çerez veya API anahtarı okumaz. Sitenin düğmelerine basıldığında Evren'in normal istekleri yapılır.
+Bu açıklama uzantının yaptığı işlemler içindir; başka sekmede yaptığın ücretli Evren işlemlerini engellemez.
 
-Evren'deki LLM token kotanız bu uzantıya bağlı değildir. Sitenin otomatik etiketleme işlemlerinin kullandığı kaynaklar ve ücretler ayrıca değerlendirilmelidir. Hız ayarı hesap veya servis sınırlarını değiştirmez. Kota ve erişim uyarıları görüldüğünde çalışma durur.
+## Geliştirme
 
-## Geliştirme ve test
-
-`manifest.json` uzantının kimliğini ve çalışacağı adresi, `flow.js` adım sırasını, `content.js` sayfa etkileşimlerini ve paneli içerir.
-
-Kaynak kodu değiştirecekseniz Node.js ve npm ile repo klasöründe:
+Node.js 20 veya üzeriyle repo klasöründe:
 
 ```sh
 npm ci
 npm test
 npm run check
+npm run build
 ```
 
-Testler akış ve benzetilmiş sayfa etkileşimlerini kapsar. Canlı sitenin her durumunu veya üretilen etiketlerin doğruluğunu garanti etmez.
+Kurulum klasörü `release/` altında oluşur. Üçüncü taraf runtime dosyaları ve derlenmiş dosyalar bu adımda eklenir. Hazır paketi paylaşırken bu klasörü ZIP’e koy.
 
-Hata bildirirken hangi adımda durduğunu, uzantı sürümünü ve işlem günlüğündeki hata mesajını [Issues](https://github.com/keremtrgl/evrenetiketlemearaci/issues) bölümüne ekleyebilirsiniz. API anahtarı, hesap bilgisi veya özel veri seti içeriği paylaşmayın.
+Kaynaklar: [Transformers.js](https://huggingface.co/docs/transformers.js), [YOLOS Tiny](https://huggingface.co/Xenova/yolos-tiny), [Ultralytics sınıflandırma dönüşümleri](https://docs.ultralytics.com/reference/data/augment), [Evren kılavuzu](https://evren.ssyz.org.tr/guide). Bağımlılık lisansları hazır paketteki `THIRD_PARTY_NOTICES.txt` dosyasında bulunur.
 
-## Geliştirici
+Sorun bildirmek için [Issues](https://github.com/keremtrgl/evrenetiketlemearaci/issues) bölümünü kullan. Özel görsel, model ağırlığı veya hesap bilgisi paylaşmadan hata mesajını ve sürümü yaz.
 
-Kerem
-
-- GitHub: [keremtrgl](https://github.com/keremtrgl)
-- Hugging Face: [KeremTT](https://huggingface.co/KeremTT)
-
-Evren'in resmi uzantısı değildir.
+Geliştirici: [Kerem](https://github.com/keremtrgl) · [KeremTT](https://huggingface.co/KeremTT). Evren’in resmi uzantısı değildir.
