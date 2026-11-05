@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "Evren Etiketleme Yardımcısı",
+  "version": "0.2.0",
+  "author": "Kerem Terzioğlu | GitHub: https://github.com/keremtrgl | Hugging Face: https://huggingface.co/KeremTT",
+  "homepage_url": "https://github.com/keremtrgl/evrenetiketlemearaci",
+  "description": "Evren'in görünen etiketleme düğmelerini sıralı çalıştırır. Başlat/Durdur ve kayıt doğrulaması içerir.",
+  "content_scripts": [{
+    "matches": ["https://evren.ssyz.org.tr/*"],
+    "js": ["flow.js", "content.js"],
+    "run_at": "document_idle"
+  }]
+}

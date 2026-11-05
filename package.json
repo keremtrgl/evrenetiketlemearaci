@@ -1,0 +1,19 @@
+{
+  "name": "evrenetiketlemearaci",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Evren etiketleme ekranı için Chrome uzantısı",
+  "author": "Kerem Terzioğlu (https://github.com/keremtrgl)",
+  "homepage": "https://huggingface.co/KeremTT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/keremtrgl/evrenetiketlemearaci.git"
+  },
+  "scripts": {
+    "test": "node --test tests/flow.test.cjs tests/dom.test.cjs",
+    "check": "node --check flow.js && node --check content.js"
+  },
+  "devDependencies": {
+    "jsdom": "29.1.1"
+  }
+}
