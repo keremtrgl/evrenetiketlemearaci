@@ -30,6 +30,7 @@ function fixture() {
     dialog.querySelector('button').onclick=()=>{
       events.push('confirm');dialog.remove();d.getElementById('labels').textContent='ETİKETLER ( 2 ) kuş, sandalye';
     };
+    const cancel=d.createElement('button');cancel.textContent='Vazgeç';cancel.onclick=()=>dialog.remove();dialog.appendChild(cancel);
     d.body.appendChild(dialog);
   };
   d.getElementById('next').onclick=()=>{
@@ -62,14 +63,16 @@ test('Mevcut meta varsa tekrar üretmeden canlı olmayan sınıfı da onay akı�
     assert.deepEqual(f.events,['auto','confirm','next']);
   }finally{f.close();}
 });
-test('Yeni sınıf izni kapalıysa sandalyeyi sessizce atlamaz; açıklayarak durur',async()=>{
+test('Yeni sınıf izni kapalıysa onaylamadan ilerler ve hata nedenini saklar',async()=>{
   const f=fixture();
   try{
     f.panel.getElementById('new').checked=false;
     f.panel.getElementById('start').click();
     await until(()=>!f.panel.getElementById('start').disabled);
-    assert.deepEqual(f.events,['meta','auto']);
-    assert.match(f.panel.getElementById('log').textContent,/Yeni sınıf/);
+    assert.deepEqual(f.events,['meta','auto','next']);
+    const queue=JSON.parse(f.w.sessionStorage.getItem('evren-label-helper-v1')).deferred;
+    assert.equal(queue.length,1);
+    assert.match(queue[0].reason,/Yeni sınıf/);
   }finally{f.close();}
 });
 test('Durdur, devam eden meta sonrasında onay ve sonraki işlemlerini engeller',async()=>{
@@ -80,5 +83,114 @@ test('Durdur, devam eden meta sonrasında onay ve sonraki işlemlerini engeller'
     f.panel.getElementById('stop').click();
     await until(()=>!f.panel.getElementById('start').disabled);
     assert.deepEqual(f.events,['meta']);
+  }finally{f.close();}
+});
+
+test('Geç etkinleşen onay düğmesini bekler ve yalnız bir kez onaylar',async()=>{
+  const f=fixture();
+  try{
+    const open=f.d.getElementById('auto').onclick;
+    f.d.getElementById('auto').onclick=()=>{
+      open();const b=f.d.querySelector('[role="dialog"] button');b.disabled=true;
+      f.w.setTimeout(()=>{b.disabled=false;},600);
+    };
+    f.panel.getElementById('start').click();
+    await until(()=>!f.panel.getElementById('start').disabled);
+    assert.deepEqual(f.events,['meta','auto','confirm','next']);
+    assert.equal(f.panel.getElementById('done').textContent,'1');
+  }finally{f.close();}
+});
+
+test('Onay beklerken durdurulursa istek göndermez ve yarım işlem bırakmaz',async()=>{
+  const f=fixture();
+  try{
+    const open=f.d.getElementById('auto').onclick;
+    f.d.getElementById('auto').onclick=()=>{
+      open();f.d.querySelector('[role="dialog"] button').disabled=true;
+    };
+    f.panel.getElementById('start').click();
+    await until(()=>f.events.includes('auto'));
+    assert.equal(f.panel.getElementById('start').disabled,true);
+    f.panel.getElementById('stop').click();
+    await until(()=>!f.panel.getElementById('start').disabled);
+    assert.equal(f.events.includes('confirm'),false);
+    assert.equal(JSON.parse(f.w.sessionStorage.getItem('evren-label-helper-v1')||'{}').pending||'','');
+  }finally{f.close();}
+});
+
+test('Yarım kalan eski kayıt Başlat düğmesini kilitlemez ve anotasyonu tekrarlamaz',async()=>{
+  const f=fixture();
+  try{
+    f.w.sessionStorage.setItem('evren-label-helper-v1',JSON.stringify({pending:'/annotate/dataset:kus.jpg',saved:[]}));
+    f.d.getElementById('evren-label-helper').remove();
+    f.w.eval(fs.readFileSync(path.join(extension,'content.js'),'utf8'));
+    const panel=f.d.getElementById('evren-label-helper').shadowRoot;
+    panel.getElementById('limit').value=1;
+    f.d.getElementById('labels').textContent='ETİKETLER ( 2 )';
+    panel.getElementById('start').click();
+    await until(()=>!panel.getElementById('start').disabled);
+    assert.deepEqual(f.events,['next']);
+    assert.doesNotMatch(panel.getElementById('log').textContent,/Önce sitede kontrol/);
+  }finally{f.close();}
+});
+
+test('Hatalı görseli not edip ilerler, tur sonunda geri dönüp bir kez yeniden dener',async()=>{
+  const f=fixture();
+  try{
+    let index=1;let first=true;
+    const head=f.d.querySelector('header');
+    const counter=f.d.createElement('span');head.appendChild(counter);
+    const prev=f.d.createElement('button');prev.innerHTML='<svg class="lucide-chevron-left"></svg>';head.appendChild(prev);
+    const render=()=>{counter.textContent=index+' / 3';f.d.getElementById('filename').textContent=index===1?'kus.jpg':'gorsel'+index+'.jpg';f.d.getElementById('labels').textContent='ETİKETLER ( 0 )';};
+    render();
+    f.d.getElementById('next').onclick=()=>{f.events.push('next');index++;render();};
+    prev.onclick=()=>{f.events.push('previous');index--;render();};
+    const open=f.d.getElementById('auto').onclick;
+    f.d.getElementById('auto').onclick=()=>{
+      open();const dialog=f.d.querySelector('[role="dialog"]');
+      if(first){first=false;const match=dialog.querySelector('p');match.textContent='YENİ SINIF ÖNERİSİ ( 1 )';}
+      else dialog.querySelector('p').textContent='MEVCUT SINIFLARLA EŞLEŞEN ( 2 )';
+    };
+    f.panel.getElementById('new').checked=false;
+    f.panel.getElementById('rpm').value=60;
+    f.panel.getElementById('start').click();
+    await until(()=>!f.panel.getElementById('start').disabled);
+    assert.equal(f.events.filter(e=>e==='confirm').length,1);
+    assert.equal(f.events.includes('previous'),true);
+    assert.equal(f.panel.getElementById('done').textContent,'1');
+    assert.equal(JSON.parse(f.w.sessionStorage.getItem('evren-label-helper-v1')).deferred.length,0);
+  }finally{f.close();}
+});
+
+test('Önceden onay gönderilmiş ama sonuç görünmüyorsa yeniden etiketleme yapmaz',async()=>{
+  const f=fixture();
+  try{
+    f.w.sessionStorage.setItem('evren-label-helper-v1',JSON.stringify({pending:'/annotate/dataset:kus.jpg',saved:[]}));
+    f.d.getElementById('evren-label-helper').remove();
+    f.w.eval(fs.readFileSync(path.join(extension,'content.js'),'utf8'));
+    const panel=f.d.getElementById('evren-label-helper').shadowRoot;
+    panel.getElementById('limit').value=1;
+    panel.getElementById('start').click();
+    await until(()=>!panel.getElementById('start').disabled);
+    assert.deepEqual(f.events,['next']);
+    const state=JSON.parse(f.w.sessionStorage.getItem('evren-label-helper-v1'));
+    assert.equal(state.pending,'');
+    assert.equal(state.deferred[0].submitted,true);
+    assert.equal(state.deferred[0].status,'inceleme gerekli');
+  }finally{f.close();}
+});
+
+test('Kota uyarısı geldiğinde erteleme bahanesiyle sıradaki görsele geçmez',async()=>{
+  const f=fixture();
+  try{
+    const open=f.d.getElementById('auto').onclick;
+    f.d.getElementById('auto').onclick=()=>{
+      open();f.d.querySelector('[role="dialog"] button').disabled=true;
+      f.d.getElementById('notifications').textContent='Günlük kota doldu';
+    };
+    f.panel.getElementById('start').click();
+    await until(()=>!f.panel.getElementById('start').disabled);
+    assert.deepEqual(f.events,['meta','auto']);
+    assert.match(f.panel.getElementById('log').textContent,/Site uyarısı/);
   }finally{f.close();}
 });

@@ -1,6 +1,6 @@
 # Evren Etiketleme Aracı
 
-[Kerem](https://github.com/keremtrgl) · [Hugging Face](https://huggingface.co/KeremTT) · Sürüm 0.2.0
+[Kerem](https://github.com/keremtrgl) · [Hugging Face](https://huggingface.co/KeremTT) · Sürüm 0.2.1
 
 Evren'de görselleri tek tek açıp aynı düğmelere basmak yerine, etiketleme adımlarını sırayla çalıştıran bir Chrome uzantısı.
 
@@ -32,14 +32,14 @@ Yüklediğiniz klasörü sonradan silmeyin veya taşımayın. Chrome uzantıyı 
 5. **Başlat** düğmesine basın. İşlem günlüğünden hangi adımda olduğunu takip edebilirsiniz.
 6. Sonraki görsele geçtiğinde önceki görseli açıp sınıfları ve çizimleri kontrol edin.
 
-Yeni sınıf önerileri çıkarsa ve ilgili izin kapalıysa araç durur. Önerilere bakıp veri setinize uygun olup olmadığına karar verin.
+Yeni sınıf önerileri çıkarsa ve ilgili izin kapalıysa o görsel onaylanmadan ertelenir. Önerilere bakıp veri setinize uygun olup olmadığına karar verebilirsiniz.
 
 ## Ayarlar ne işe yarıyor?
 
 | Ayar | Açıklama |
 | --- | --- |
 | Görsel / dakika | Yeni görselleri işlemeye başlama hızının üst sınırı. 0,1 ile 60 arasında ayarlanabilir. |
-| Çalışma sınırı | O çalışmada ziyaret edilecek görsel sayısı. Etiketli olduğu için atlanan görseller de bu sayıya dahildir. En fazla 1.000 girilebilir. |
+| Çalışma sınırı | İlk turda ziyaret edilecek görsel sayısı. Etiketli olduğu için atlananlar dahildir. En fazla 1.000 girilebilir. Tur sonundaki geri dönüş denemeleri bu sayıya eklenir. |
 | Yeni sınıf önerilerini de onayla | Sitenin önerdiği yeni sınıfların onaylanmasına izin verir. Başlangıçta kapalıdır. |
 | Durdur | Yeni adımların başlamasını engeller. Sunucuda zaten başlamış bir işlem tamamlanabilir. |
 
@@ -59,13 +59,15 @@ Yeni etiket oluşması ve sonraki görsele geçiş izlenir. Paneldeki **Tamamlan
 
 **“Manifest dosyası bulunamadı” yazıyor:** Yanlış klasör seçilmiştir. `manifest.json` dosyasını doğrudan gördüğünüz klasörü yükleyin.
 
-**“Gerekli düğme bulunamadı veya kullanılamıyor” yazıyor:** Site düğmesi henüz hazır olmayabilir veya arayüz değişmiş olabilir. Açık pencereyi ve işlem günlüğünü kontrol edin. Bu sürümde onay düğmesi geç etkinleştiğinde çalışma durabiliyor.
+**Onay düğmesi geç açılıyor:** Araç düğmenin etkinleşmesini en fazla 30 saniye bekler. Süre dolarsa görselin sırasını ve hata nedenini erteleme listesine yazar.
 
-**“Yarım kalan görsel var” yazıyor:** Aynı görseli yeniden etiketlememek için işlem kilitlenmiştir. Önce açık görselin etiketlerini kontrol edip gerekiyorsa siteden kaydedin. Panelde **Yarım kalan işlem → Kontrol ettim, kilidi kaldır** düğmesini kullanın. Açık onay penceresi varsa önce onu sonuçlandırın veya kapatın. Sonra tekrar başlatın.
+**Yarım kalan işlemler:** Elle kilit kaldırma yoktur. Başlat dediğinizde önceki onayın sonucu kontrol edilir. Etiketler görünüyorsa tekrar onay gönderilmez. Onay gönderilmiş ama sonuç belirsizse görsel inceleme notuyla saklanır; aynı istek tekrar gönderilmez.
 
-**Yeni etiket oluşmuyor:** Model nesne bulamamış olabilir. Araç bekleme süresinin sonunda durur; boş sonuçları otomatik olarak inceleyip devam etmez.
+**Ertelenen görseller:** İşlem başarısız olursa mümkün olduğunda açık öneri penceresi kapatılır ve sonraki görsele geçilir. Tur sonunda sıra numarasıyla geri dönülür. Her turda bir dönüş, kayıt başına toplam en fazla iki otomatik dönüş denenir. Çözülemeyenler panelde nedenleriyle kalır. Dönüş için sitenin sıra göstergesi ve önceki görsel düğmesi gerekir; veri seti sırası değişmişse yanlış görsel etiketlenmez.
 
-Çalışırken elle başka görsele veya veri setine geçmeyin. Son görselde sonraki düğmesi olmadığında araç durabilir. Sekme kapanması, bilgisayarın uyuması veya bağlantının kesilmesi sonrasında kaldığı adımı otomatik toparlama desteği yoktur.
+**Yeni etiket oluşmuyor:** Bekleme sonunda sonuç not edilir. Onay gönderilmişse yalnız sonuç kontrolü yapılır; otomatik olarak ikinci kez maske üretimi başlatılmaz. Sunucu hâlâ çalışıyorsa, öneri penceresi güvenli biçimde kapatılabilene kadar beklenir.
+
+Çalışırken elle başka görsele veya veri setine geçmeyin. Son görselde sonraki düğmesi olmadığında araç durabilir. Notlar aynı sekmenin oturumunda, sayfa yenilense de korunur. Sekme kapatıldıktan sonra kalıcı kuyruk ve kapalı tarayıcıda çalışma desteği yoktur. Kota, erişim engeli veya veri seti değişiminde çalışma durur.
 
 ## Güncelleme
 

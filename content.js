@@ -22,7 +22,7 @@
       #history{white-space:pre-wrap;overflow-wrap:anywhere;max-height:150px;overflow:auto;font-size:11px;color:#a9c1d3}.hidden{display:none}
     </style>
     <section>
-      <header><div><h2>Etiketleme yardımcısı</h2><small>Evren · v0.2.0</small></div><button id="fold" aria-label="Paneli daralt">−</button></header>
+      <header><div><h2>Etiketleme yardımcısı</h2><small>Evren · v0.2.1</small></div><button id="fold" aria-label="Paneli daralt">−</button></header>
       <div class="body" id="body">
       <p>AI Meta, otomatik etiketleme ve sonraki görsel.</p>
       <div class="fields">
@@ -37,7 +37,7 @@
       <small id="time">Geçen süre 00:00 · Bekliyor</small>
       <output id="log" aria-live="polite">Hazır. Veri setini veya etiketleme ekranını aç.</output>
       <details><summary>İşlem günlüğü</summary><pre id="history"></pre></details>
-      <details><summary>Yarım kalan işlem</summary><p>Hata sonrası mevcut görseli sitede kontrol edip gerekirse kaydedin. Sonra kilidi kaldırın.</p><button id="reset">Kontrol ettim, kilidi kaldır</button></details>
+      <details><summary>Ertelenen görseller (<span id="queued">0</span>)</summary><p>Hatalı görseller not alınır. Tur sonunda otomatik dönüş denenir. Sonucu belirsiz onaylar tekrar gönderilmez.</p><pre id="queue"></pre></details>
       </div>
     </section>`;
   document.documentElement.appendChild(host);
@@ -63,6 +63,8 @@
   catch { persisted = {}; }
   const saved = new Set(Array.isArray(persisted.saved) ? persisted.saved : []);
   let pending = persisted.pending || '';
+  let deferred = Array.isArray(persisted.deferred) ? persisted.deferred : [];
+  let jobPath = '';
   let controller = null;
   let completed = 0;
   let skipped = 0;
@@ -72,7 +74,15 @@
   let history = [];
   let signals = [];
   const seenSignals = new WeakMap();
-  const saveState = () => sessionStorage.setItem(storageKey, JSON.stringify({saved:[...saved],pending}));
+  const position = () => {
+    const match = document.querySelector('header')?.innerText.match(/(\d+)\s*\/\s*(\d+)/);
+    return match ? Number(match[1]) : null;
+  };
+  const saveState = () => {
+    sessionStorage.setItem(storageKey, JSON.stringify({saved:[...saved],pending,deferred}));
+    $('queued').textContent=String(deferred.length);
+    $('queue').textContent=deferred.map(item=>(item.position || '?')+' · '+item.key.split(':').pop()+' · '+item.status+' · '+item.reason).join('\n');
+  };
   const log = message => {
     $('log').textContent = message;
     history.push(new Date().toLocaleTimeString('tr-TR')+'  '+message);
@@ -111,6 +121,7 @@
   function check() {
     if (!controller || controller.signal.aborted) throw new Error('Durduruldu');
     if (!location.pathname.startsWith('/annotate/')) throw new Error('Etiketleme sayfasından çıkıldı');
+    if (jobPath && location.pathname!==jobPath) throw new Error('Veri seti değişti; işlem durduruldu');
     const problem = signals.find(s => /kota|rate.?limit|çok fazla istek|too many requests|bot olarak|erişim engel|captcha|yetkisiz|oturum.*sona|başarısız|hata oluştu/.test(s));
     if (problem) throw new Error('Site uyarısı: ' + problem.slice(0,180));
   }
@@ -150,13 +161,27 @@
   }
   let autoDialog = null;
   let countBefore = 0;
+  async function readyConfirmation() {
+    const current=key();
+    return waitFor(()=>{
+      if(key()!==current) throw new Error('Görsel değişti; işlem durduruldu');
+      autoDialog=[...document.querySelectorAll('[role="dialog"]')]
+        .find(el=>visible(el) && /otomatik etiketle/.test(norm(el.innerText)));
+      if(!autoDialog) return false;
+      const button=findButton(/^onayla ve etiketle\s*\(\s*[1-9]\d*\s*\)$/,autoDialog);
+      return button && !button.disabled && button.getAttribute('aria-disabled')!=='true' ? button : false;
+    },'Onay düğmesi zamanında hazır olmadı',30000);
+  }
   async function openSuggestions() {
     log('Otomatik etiketleme önerileri açılıyor…');
     countBefore = labelCount();
     if(countBefore === null) throw new Error('Etiket sayısı okunamadı; arayüz kontrol edilmeli');
-    click(findButton(/^otomatik etiketle$/));
+    const existing=[...document.querySelectorAll('[role="dialog"]')].find(el=>visible(el) && /otomatik etiketle/.test(norm(el.innerText)));
+    if(!existing) click(findButton(/^otomatik etiketle$/));
     autoDialog = await waitFor(()=>[...document.querySelectorAll('[role="dialog"]')]
       .find(el=>visible(el) && /otomatik etiketle/.test(norm(el.innerText))), 'Öneri penceresi açılmadı',20000);
+    log('Önerilerin ve onay düğmesinin hazır olması bekleniyor…');
+    await readyConfirmation();
     const newCount = norm(autoDialog.innerText).match(/yeni sınıf önerisi\s*\(\s*(\d+)\s*\)/);
     if(!newCount && /yeni sınıf/.test(norm(autoDialog.innerText)))
       throw new Error('Yeni sınıf sayısı okunamadı');
@@ -164,8 +189,7 @@
   }
   async function confirmSuggestions() {
     log('Seçili öneriler onaylanıyor…');
-    const confirm = findButton(/^onayla ve etiketle\s*\(\s*[1-9]\d*\s*\)$/,autoDialog);
-    if(!confirm) throw new Error('Onaylanacak öneri yok veya düğme biçimi değişti');
+    const confirm = await readyConfirmation();
     pending = key(); saveState();
     click(confirm);
   }
@@ -192,19 +216,106 @@
     await waitFor(()=>key() && key()!==previous && labelsReady(),'Sonraki görsele geçiş doğrulanamadı',20000);
   }
   $('stop').onclick = ()=> { controller?.abort(); log('Durduruldu. Başlamış sunucu işlemi tamamlanabilir; yeni adım başlatılmaz.'); };
-  $('reset').onclick = ()=> {
-    if(controller && !controller.signal.aborted) return;
-    pending=''; saveState(); log('Yarım kalan işlem kilidi kaldırıldı.');
-  };
+  function noteDeferred(current,reason,submitted,index) {
+    let item=deferred.find(item=>item.key===current);
+    if(!item){item={key:current,path:jobPath || location.pathname,position:index,attempts:0};deferred.push(item);}
+    Object.assign(item,{reason,submitted:item.submitted || submitted,status:'bekliyor',updatedAt:Date.now()});
+    pending='';saveState();return item;
+  }
+  async function closeSuggestions() {
+    const dialog=[...document.querySelectorAll('[role="dialog"]')].find(el=>visible(el) && /otomatik etiketle/.test(norm(el.innerText)));
+    if(!dialog) return;
+    const cancel=await waitFor(()=>{
+      if(!visible(dialog)) return {closed:true};
+      const button=findButton(/^vazgeç$/,dialog);
+      return button && !button.disabled ? button : false;
+    },'Devam eden site işlemi bitmedi; güvenli gezinme yapılamıyor');
+    if(visible(dialog)) click(cancel);
+    await waitFor(()=>!visible(dialog),'Öneri penceresi kapatılamadı',20000);
+  }
+  async function navigateTo(item) {
+    if(item.path!==location.pathname) throw new Error('Veri seti değişti; işlem durduruldu');
+    if(key()===item.key) return;
+    if(!item.position || !position()) throw new Error('Görsel sırası okunamadı; dönüş için not saklandı');
+    for(let hop=0;position()!==item.position && hop<1000;hop++) {
+      check();const previous=key();const before=position();
+      if(before<item.position) await nextVerified();
+      else {
+        const back=[...document.querySelectorAll('header button')].find(button=>button.querySelector('svg.lucide-chevron-left') && visible(button));
+        if(!back || back.disabled) throw new Error('Önceki görsel düğmesi kullanılamıyor');
+        click(back);
+        await waitFor(()=>key()!==previous && labelsReady(),'Önceki görsele geçilemedi',20000);
+      }
+      if(position()===before) throw new Error('Görsel sırası değişmedi');
+    }
+    if(key()!==item.key) throw new Error('Görsel sırası değişmiş; yanlış görsel işlenmedi');
+  }
+  async function processCurrent() {
+    const current=key();const index=position();
+    const waiting=deferred.find(item=>item.key===current);
+    if(waiting?.submitted) {
+      if(labelCount()>0) {
+        deferred=deferred.filter(item=>item.key!==current);saveState();
+        log('Önceden gönderilen işlemin etiketleri bulundu; yeniden onay gönderilmiyor.');
+      } else {
+        waiting.status='inceleme gerekli';waiting.reason='Onay gönderilmiş, sonuç henüz doğrulanamıyor';saveState();
+        log('Sonucu belirsiz işlem not edildi; yeniden etiketleme yapılmadan geçiliyor.');
+        await closeSuggestions();
+        await nextVerified();skipped++;return;
+      }
+    }
+    if(labelCount()>0 && !saved.has(current)) {
+      log('Mevcut etiketli görsel korunuyor; sonraki görsele geçiliyor.');
+      await nextVerified();skipped++;
+      deferred=deferred.filter(item=>item.key!==current);saveState();return;
+    }
+    try {
+      await EvrenLabelFlow.runOne({key,wasSaved:k=>saved.has(k),prepareMeta,openSuggestions,
+        confirmSuggestions,waitForLabels,nextVerified,saveAndNextVerified},
+        {signal:controller.signal,allowNewClasses:$('new').checked});
+      deferred=deferred.filter(item=>item.key!==current);saveState();
+    } catch(error) {
+      if(controller.signal.aborted || /Site uyarısı|Veri seti değişti|Görsel değişti|sayfasından çıkıldı/.test(error.message)) throw error;
+      if(key()!==current) throw error;
+      noteDeferred(current,error.message,pending===current,index);
+      log('Görsel ertelendi: '+error.message+'. Tur sonunda tekrar kontrol edilecek.');
+      await closeSuggestions();
+      const next=findButton(/^sonraki(?: görsel)?$/) || findButton(/^kaydet ve sonraki$/);
+      if(next && !next.disabled) await nextVerified();
+      else throw new Error('Sonraki görsele geçilemiyor; ertelenen görsel notu saklandı');
+    }
+  }
+  async function retryDeferred() {
+    const resume={key:key(),path:jobPath,position:position()};
+    const batch=deferred.filter(item=>item.path===jobPath && item.status==='bekliyor');
+    for(const item of batch) {
+      check();
+      if(item.attempts>=2){item.status='inceleme gerekli';saveState();continue;}
+      item.attempts++;saveState();
+      log('Ertelenen görsele dönülüyor: '+(item.position || item.key.split(':').pop()));
+      try {
+        await navigateTo(item);
+        const delay=EvrenLabelFlow.delayUntilNext(lastStart,Number($('rpm').value),Date.now());
+        if(delay>0){const until=Date.now()+delay;await waitFor(()=>Date.now()>=until,'Yeniden deneme hız beklemesi tamamlanamadı',delay+3000);}
+        lastStart=Date.now();
+        await processCurrent();
+      }
+      catch(error) {
+        if(controller.signal.aborted || /Site uyarısı|Veri seti değişti|Görsel değişti/.test(error.message)) throw error;
+        item.reason+='; dönüş: '+error.message;item.status='inceleme gerekli';saveState();
+      }
+    }
+    if(batch.length && resume.position && key()!==resume.key) await navigateTo(resume);
+  }
   $('start').onclick = async()=>{
     if(controller && !controller.signal.aborted) return;
-    if(pending) { log('Yarım kalan görsel var. Önce sitede kontrol edin; sonra kilidi kaldırın.'); return; }
     const limit = Number($('limit').value);
     const rpm = Number($('rpm').value);
     if(!Number.isInteger(limit) || limit<1 || limit>1000) { log('1–1000 arası görsel sayısı girin.'); return; }
     try { EvrenLabelFlow.delayUntilNext(null,rpm,Date.now()); } catch(error) {log(error.message);return;}
     $('start').disabled=true; $('stop').disabled=false;
-    $('limit').disabled=true; $('rpm').disabled=true; $('new').disabled=true; $('reset').disabled=true;
+    $('limit').disabled=true; $('rpm').disabled=true; $('new').disabled=true;
+    jobPath=location.pathname.startsWith('/annotate/') ? location.pathname : '';
     controller = new AbortController(); completed=0; skipped=0; visited=0; signals=[];
     startedAt=Date.now();lastStart=null;history=[];$('progress').max=limit;
     log('Çalışma başladı. Hedef: '+rpm+' görsel/dakika; sınır: '+limit+'.');
@@ -221,6 +332,8 @@
         }
       }
       await waitFor(()=>key() && labelsReady(),'Etiketleme ekranı hazır değil',20000);
+      jobPath=location.pathname;
+      if(pending) noteDeferred(pending,'Önceki çalışmanın sonucu otomatik kontrol edilecek',true,pending===key()?position():null);
       for(let n=0;n<limit;n++) {
         check();
         const delay = EvrenLabelFlow.delayUntilNext(lastStart,rpm,Date.now());
@@ -233,22 +346,18 @@
           },'Hedef hız beklemesi tamamlanamadı',delay+3000);
         }
         lastStart=Date.now();
-        if(labelCount()>0 && !saved.has(key())) {
-          log('Mevcut etiketli görsel korunuyor; sonraki görsele geçiliyor.');
-          await nextVerified(); skipped++; visited++; refreshStats(); continue;
-        }
-        await EvrenLabelFlow.runOne({key,wasSaved:k=>saved.has(k),prepareMeta,openSuggestions,
-          confirmSuggestions,waitForLabels,nextVerified,saveAndNextVerified},
-          {signal:controller.signal,allowNewClasses:$('new').checked});
+        await processCurrent();
         visited++; refreshStats();
       }
-      log('Çalışma tamamlandı. '+completed+' görsel işlendi; '+skipped+' etiketli görsel atlandı. Sonuçları kontrol edin.');
+      await retryDeferred();refreshStats();
+      log('Çalışma tamamlandı. '+completed+' görsel işlendi; '+skipped+' görsel atlandı; '+deferred.length+' ertelenen/inceleme notu kaldı.');
     } catch(error) {
       log('Durdu: '+error.message+'\nTamamlanan görsel: '+completed);
     } finally {
       controller?.abort(); $('start').disabled=false; $('stop').disabled=true;
-      $('limit').disabled=false; $('rpm').disabled=false; $('new').disabled=false; $('reset').disabled=false;
+      $('limit').disabled=false; $('rpm').disabled=false; $('new').disabled=false;
     }
   };
-  log(pending ? 'Önceki işlem yarım kaldı. Mevcut görseli kontrol edin.' : 'Hazır. İlk denemede 1–5 görsel seçin.');
+  saveState();
+  log(pending ? 'Önceki işlemin sonucu Başlat ile otomatik kontrol edilecek.' : 'Hazır. İlk denemede 1–5 görsel seçin.');
 })();
