@@ -1,6 +1,6 @@
 # Evren Etiketleme Aracı
 
-[Kerem Terzioğlu](https://github.com/keremtrgl) · [Hugging Face](https://huggingface.co/KeremTT) · Sürüm 0.2.0
+[Kerem](https://github.com/keremtrgl) · [Hugging Face](https://huggingface.co/KeremTT) · Sürüm 0.2.0
 
 Evren'de görselleri tek tek açıp aynı düğmelere basmak yerine, etiketleme adımlarını sırayla çalıştıran bir Chrome uzantısı.
 
@@ -98,7 +98,7 @@ Hata bildirirken hangi adımda durduğunu, uzantı sürümünü ve işlem günl�
 
 ## Geliştirici
 
-Kerem Terzioğlu
+Kerem
 
 - GitHub: [keremtrgl](https://github.com/keremtrgl)
 - Hugging Face: [KeremTT](https://huggingface.co/KeremTT)
