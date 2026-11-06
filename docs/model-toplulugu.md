@@ -31,3 +31,8 @@ Mevcut hazır Anadolu1000 ve Anadolu500 ONNX dosyaları alındı; uzaktan dönü
 Bu sürüm modelleri tek ağırlıkta birleştirmez ve kendi kendine yeni model eğitmez. Sınıflandırma modelleri birlikte çalışabilir; kullanıcının tespit/segmentasyon ONNX modelleri için görev çözücüleri henüz yok. Fotoğraftaki genel nesneyi yerel YOLOS modeli bulur; mikroskop gibi alanlarda kutuyu elle seçmek gerekebilir.
 
 Kaynaklar: [Model soups](https://arxiv.org/abs/2203.05482), [Fisher ağırlıklı birleştirme](https://arxiv.org/abs/2111.09832), [Ultralytics model toplulukları](https://docs.ultralytics.com/yolov5/tutorials/model-ensembling).
+
+
+## v0.5 otomatik çalışma
+
+Yan panel otomasyonu en az iki farklı etkin uzman ve aynı türde en az 0,90 puan, ikinci tahmine en az 0,20 fark ister. Bir kutu belirsizse bütün görsel incelemeye ayrılır. Bu eşikler elle görünen önerinin eşiklerinden daha sıkıdır; doğruluk veya kutu kalitesi garantisi değildir. Sınıf eşlemesi veri setine özel kaydedilir. Genel tespitçinin kapsamı değişmedi.
