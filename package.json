@@ -1,6 +1,6 @@
 {
   "name": "evrenetiketlemearaci",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "private": true,
   "description": "Evren etiketleme ekranı için Chrome uzantısı",
   "author": "Kerem (https://github.com/keremtrgl)",
@@ -11,7 +11,7 @@
   },
   "scripts": {
     "test": "node --test tests/*.test.cjs",
-    "check": "node --check site.js && node --check background.js && node --check src/app.js && node --check src/worker.js && node --check core/annotations.js && node --check core/classifier.js && node --check core/model-bank.js && node --check core/site-state.js && node --check core/site-client.js && node --check core/automation.js",
+    "check": "node --check site.js && node --check background.js && node --check src/app.js && node --check src/worker.js && node --check core/annotations.js && node --check core/classifier.js && node --check core/model-bank.js && node --check core/site-state.js && node --check core/site-client.js && node --check core/automation.js && node --check core/image.js",
     "build": "node scripts/build.cjs",
     "prebuild": "node --test tests/manifest.test.cjs"
   },

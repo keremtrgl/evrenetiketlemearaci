@@ -1,4 +1,4 @@
-const A=globalThis.EvrenAnnotations,C=globalThis.EvrenClassifier,B=globalThis.EvrenModelBank,S=globalThis.EvrenSiteState,Automation=globalThis.EvrenAutomation;
+const A=globalThis.EvrenAnnotations,C=globalThis.EvrenClassifier,B=globalThis.EvrenModelBank,S=globalThis.EvrenSiteState,Automation=globalThis.EvrenAutomation,I=globalThis.EvrenImage;
 const $=id=>document.getElementById(id);
 const canvas=$('canvas'),ctx=canvas.getContext('2d');
 let items=[],current=-1,bitmap=null,selected=null,tool='select',draft=[],drag=null,zoom=0,busy=false,stopped=false,worker=null,sequence=0,ownReady=false;
@@ -87,7 +87,7 @@ $('mapping-save').onclick=async()=>{
   try{const next={...mappings,[label]:name};await writeMappings(context.source.path,next);if(siteContext?.source?.path!==context.source.path)throw new Error('Veri seti değişti');mappings=next;mappingsPath=context.source.path;$('mapping-state').textContent=label+' → '+name+' eşlemesi hatırlandı.';renderSite();}
   catch{status('Eşleme kaydedilemedi; otomatik çalışma başlatılmadı.',true);}
 };
-$('diagnostic').onclick=()=>download('evren-tani-raporu.json',JSON.stringify(S.diagnostic({version:'0.5.1',context:siteContext,item:active(),experts,busy}),null,2));
+$('diagnostic').onclick=()=>download('evren-tani-raporu.json',JSON.stringify(S.diagnostic({version:'0.5.2',context:siteContext,item:active(),experts,busy}),null,2));
 function renderBank(){
   $('model-bank').replaceChildren();
   for(const expert of experts){
@@ -176,7 +176,7 @@ function draw(){
 async function open(index){
   if(index<0||index>=items.length)return;
   const request=++openRequest,item=items[index];
-  const data=await imageData(item);const blob=await(await fetch(data)).blob();const nextBitmap=await createImageBitmap(blob);
+  const blob=item.dataUrl?I.toBlob(item.dataUrl):item.file;const nextBitmap=await createImageBitmap(blob);
   if(request!==openRequest){nextBitmap.close();return;}
   if(nextBitmap.width*nextBitmap.height>25000000){nextBitmap.close();throw new Error('Görsel 25 megapikselden büyük. Önce küçültün.');}
   item.width=nextBitmap.width;item.height=nextBitmap.height;
@@ -488,8 +488,8 @@ $('auto-start').onclick=async()=>{
   try{
     if(!cloudMode)throw new Error('Otomatik çalışma için Evren yan panelini kullan');
     const routed=B.route(experts,$('domain').value);if(routed.length<2)throw new Error('Önce aynı alanda en az iki uzman model yükle');
-    const labels=routed[0].labels.filter(label=>routed.every(e=>e.labels.includes(label)));
-    if(!labels.some(label=>S.mappedClass(label,mappings,siteContext?.siteClasses||[])))throw new Error('Önce ortak bir model türünü mevcut Evren sınıfına eşle');
+    const targets=routed.map(expert=>new Set(expert.labels.map(label=>S.mappedClass(label,mappings,siteContext?.siteClasses||[])).filter(Boolean)));
+    if(![...targets[0]].some(name=>targets.every(set=>set.has(name))))throw new Error('Her uzmandaki tür adını aynı mevcut Evren sınıfına eşle');
   }
   catch(error){status(error.message,true);return;}
   stopped=false;automationTab=null;automationPath=null;setBusy(true);reviewQueue=[];$('review-queue').replaceChildren();

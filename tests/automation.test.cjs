@@ -13,6 +13,11 @@ test('Tek belirsiz nesne varsa görsel kısmen onaylanmaz',()=>{
   const good={id:'a',type:'box',geometry:[.1,.1,.4,.5],ensemble:{votes:[vote('sincap'),vote('sincap')]}};
   assert.equal(approve([good,{...good,id:'b',ensemble:{votes:[vote('sincap'),{results:[{label:'sincap',score:.55}]}]}}],{mappings:{sincap:'sincap'},classes:['sincap']}).ok,false);
 });
+test('Farklı yazılmış tür adları yalnız açık eşlemeyle aynı sınıfta uzlaşır',()=>{
+  const a={id:'a',type:'box',geometry:[.1,.1,.4,.5],ensemble:{votes:[vote('Turdus_merula'),vote('turdus_merula')]}};
+  const policy={mappings:{Turdus_merula:'karatavuk',turdus_merula:'karatavuk'},classes:['karatavuk']};
+  assert.equal(approve([a],policy).ok,true);assert.equal(approve([a],{...policy,mappings:{Turdus_merula:'karatavuk'}}).ok,false);
+});
 test('Geçersiz olasılık ve yinelenen uzman oyları otomatik onaylanmaz',()=>{
   const a={id:'a',type:'box',geometry:[.1,.1,.4,.5],ensemble:{votes:[{modelId:'one',results:[{label:'sincap',score:.97},{label:'other',score:NaN}]},{modelId:'two',...vote('sincap')}]}};
   const policy={mappings:{},classes:['sincap']};assert.equal(approve([a],policy).ok,false);

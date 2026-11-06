@@ -17,7 +17,7 @@ function fixture(options={}){
   w.File.prototype.arrayBuffer=async function(){return Uint8Array.from(Buffer.from(this.name)).buffer;};
   w.File.prototype.text=async function(){return '["nesne","Turdus_merula"]';};
   w.FileReader=class{readAsDataURL(file){this.result='data:image/png;base64,'+Buffer.from(file.name||'crop').toString('base64');setTimeout(()=>this.onload(),0);}};
-  w.fetch=async url=>({blob:async()=>({name:Buffer.from(String(url).split(',')[1]||'','base64').toString()})});
+  w.fetch=async url=>{if(options.blockFetch)throw new Error('Failed to fetch');return {blob:async()=>({name:Buffer.from(String(url).split(',')[1]||'','base64').toString()})};};
   w.createImageBitmap=async blob=>{if(blob.name==='bozuk.png')throw new Error('Görsel açılamadı');return {width:100,height:100,close(){}};};
   w.OffscreenCanvas=class{getContext(){return {drawImage(){}};}async convertToBlob(){return {name:'crop'};}};
   const saved=new Map();
@@ -28,10 +28,17 @@ function fixture(options={}){
     const original=options.chrome.tabs.sendMessage;
     w.chrome={...options.chrome,tabs:{...options.chrome.tabs,get:options.chrome.tabs.get|| (async()=>({url:'https://evren.ssyz.org.tr/annotate/id'})),sendMessage:async(id,m)=>{const r=await original(id,m);return m.type==='GET_SITE_CONTEXT'&&r.image?{ok:true,context:{...r.image,ready:true,saveState:'clean'}}:r;}}};
   }
-  for(const file of ['core/annotations.js','core/classifier.js','core/model-bank.js','core/site-state.js','core/site-client.js','core/automation.js','src/app.js'])w.eval(fs.readFileSync(path.join(root,file),'utf8'));
+  for(const file of ['core/image.js','core/annotations.js','core/classifier.js','core/model-bank.js','core/site-state.js','core/site-client.js','core/automation.js','src/app.js'])w.eval(fs.readFileSync(path.join(root,file),'utf8'));
   return {w,d,saved,posted,close:async()=>{await new Promise(r=>setTimeout(r,50));w.close();}};
 }
 function draw(f){const c=f.d.getElementById('canvas');f.d.querySelector('[data-tool="box"]').click();c.onpointerdown({clientX:10,clientY:10,pointerId:1});c.onpointerup({clientX:70,clientY:80,pointerId:1});}
+test('Ağ okumaları engelliyken bellekteki görsel doğrudan açılır',async()=>{
+  const chrome={tabs:{query:async()=>[{id:15}],sendMessage:async()=>({ok:true,image:{name:'kus.jpg',dataUrl:'data:image/png;base64,a3Vz',sourceToken:'token',source:{path:'/annotate/id',filename:'kus.jpg',position:'1 / 400'},siteClasses:['karatavuk'],existingCount:0}})}};
+  const f=fixture({blockFetch:true,cloud:true,chrome});try{
+    f.d.getElementById('capture').click();await until(()=>!f.d.getElementById('capture').disabled);
+    assert.equal(f.d.getElementById('image-name').textContent,'kus.jpg');
+  }finally{await f.close();}
+});
 async function twoExperts(f){
   for(const name of ['first.onnx','second.onnx']){
     Object.defineProperty(f.d.getElementById('own-model'),'files',{value:[new f.w.File(['x'],name)],configurable:true});
@@ -40,6 +47,16 @@ async function twoExperts(f){
   }
   await until(()=>!f.d.getElementById('auto-start').disabled);
 }
+test('Model sözlükleri farklı yazılsa da açık eşlemeleri ortak çalışma sınıfını belirler',async()=>{
+  const context={ready:true,saveState:'clean',source:{path:'/annotate/id',filename:'kus.jpg',position:'1 / 3'},siteClasses:['karatavuk'],existingCount:1,navigationToken:'nav'};
+  const chrome={tabs:{query:async()=>[{id:15}],sendMessage:async(id,m)=>{assert.equal(m.type,'GET_SITE_CONTEXT');return {ok:true,context};}}};
+  const f=fixture({cloud:true,chrome});try{
+    const lists=['["Turdus_merula","other1"]','["turdus_merula","other2"]'];f.w.File.prototype.text=async()=>lists.shift();await twoExperts(f);
+    for(const label of ['Turdus_merula','turdus_merula']){f.d.getElementById('mapping-source').value=label;f.d.getElementById('site-class').value='karatavuk';f.d.getElementById('mapping-save').click();await until(()=>f.d.getElementById('mapping-state').textContent.startsWith(label+' →'));}
+    f.d.getElementById('auto-limit').value='1';f.d.getElementById('auto-start').click();await until(()=>!f.d.getElementById('capture').disabled);
+    assert.equal(f.d.getElementById('auto-skipped').textContent,'1');
+  }finally{await f.close();}
+});
 test('Görsel almadan kaydedilen tür eşlemesi farklı veri setine taşınmaz',async()=>{
   let dataset='one';const chrome={tabs:{query:async()=>[{id:15}],sendMessage:async()=>({ok:true,context:{ready:true,saveState:'clean',source:{path:'/annotate/'+dataset,filename:'kus.jpg',position:'1 / 3'},siteClasses:['karatavuk'],existingCount:0}})}};
   const f=fixture({cloud:true,chrome});try{

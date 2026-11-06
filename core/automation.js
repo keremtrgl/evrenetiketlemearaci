@@ -8,11 +8,12 @@
       const ids=votes.map(v=>v.modelId),identified=ids.some(Boolean);
       if(a.type!=='box'||votes.length<2||!label||(identified&&(ids.some(id=>!id)||new Set(ids).size!==ids.length))||votes.some(v=>{
         const first=v.results?.[0],second=v.results?.[1]?.score??0;
-        return first?.label!==label||!Number.isFinite(first.score)||first.score<.90||first.score>1||!Number.isFinite(second)||second<0||second>1||first.score-second<.20;
+        return typeof first?.label!=='string'||!first.label||!Number.isFinite(first.score)||first.score<.90||first.score>1||!Number.isFinite(second)||second<0||second>1||first.score-second<.20;
       }))return {ok:false,reason:'İki uzmanın güçlü uzlaşması yok'};
       const siteClass=Object.hasOwn(policy.mappings||{},label)?policy.mappings[label]:label;
-      if(policy.classes.filter(n=>n===siteClass).length!==1)return {ok:false,reason:'Tür mevcut bir sınıfa tekil eşlenmedi'};
-      const result={...a,label,siteClass,reviewed:true,reviewMethod:'automatic-policy'};
+      const mapped=votes.map(v=>{const name=v.results[0].label;return Object.hasOwn(policy.mappings||{},name)?policy.mappings[name]:name;});
+      if(mapped.some(name=>name!==siteClass)||policy.classes.filter(n=>n===siteClass).length!==1)return {ok:false,reason:'Uzman türleri aynı mevcut sınıfa tekil eşlenmedi'};
+      const result={...a,label,siteClass,ensemble:{...a.ensemble,state:'agreement',label,mappedClass:siteClass},reviewed:true,reviewMethod:'automatic-policy'};
       try{A.validate(result);}catch{return {ok:false,reason:'Kutu koordinatları geçersiz'};}
       accepted.push(result);
     }

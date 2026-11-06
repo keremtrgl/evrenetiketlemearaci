@@ -2,7 +2,7 @@
 <html lang="tr">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Kerem · Yerel Etiketleme</title><link rel="stylesheet" href="app.css"></head>
 <body>
-<header class="topbar"><div class="brand"><span class="mark">K</span><div><h1>Etiketleme atölyesi</h1><span>Kerem · v0.5.1 beta</span></div></div><div class="privacy"><i></i> Yerel motor · Evren API çağrısı yok</div><a id="open-workbench" href="app.html" target="_blank">Tam atölye ↗</a></header>
+<header class="topbar"><div class="brand"><span class="mark">K</span><div><h1>Etiketleme atölyesi</h1><span>Kerem · v0.5.2 beta</span></div></div><div class="privacy"><i></i> Yerel motor · Evren API çağrısı yok</div><a id="open-workbench" href="app.html" target="_blank">Tam atölye ↗</a></header>
 <div class="workspace">
 <aside class="sources">
   <h2>Görseller</h2><div class="source-actions"><label class="button primary" for="files">Görsel aç<input id="files" type="file" accept="image/png,image/jpeg,image/webp,image/bmp" multiple hidden></label><button id="capture">Evren’den al</button></div>
@@ -26,5 +26,5 @@
   <section class="export"><h2>Etiketleri dışa aktar</h2><label><input id="review-only" type="checkbox" checked> Yalnız incelenen etiketler</label><label for="format">Biçim</label><select id="format"><option value="json">Proje JSON · tüm taslaklar</option><option value="coco">COCO JSON · tüm görseller</option><option value="yolo-box">YOLO kutu · bu görsel</option><option value="yolo-seg">YOLO poligon · bu görsel</option></select><button id="export" class="primary">Etiket dosyasını indir</button><p class="hint">Bu düğme yalnız etiket dosyası üretir. Tuvalden alınan görsellerde çıktı boyutları önizleme çözünürlüğüdür; içe aktarmadan önce özgün boyutları doğrula.</p></section>
   <footer><a href="https://huggingface.co/KeremTT" target="_blank" rel="noreferrer">KeremTT ↗</a><span id="total">0 görsel · 0 etiket</span><button id="diagnostic">Tanı raporu</button></footer>
 </aside></div>
-<script src="core/annotations.js"></script><script src="core/classifier.js"></script><script src="core/model-bank.js"></script><script src="core/site-state.js"></script><script src="core/site-client.js"></script><script src="core/automation.js"></script><script src="dist/app.js"></script>
+<script src="core/image.js"></script><script src="core/annotations.js"></script><script src="core/classifier.js"></script><script src="core/model-bank.js"></script><script src="core/site-state.js"></script><script src="core/site-client.js"></script><script src="core/automation.js"></script><script src="dist/app.js"></script>
 </body></html>

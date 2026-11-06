@@ -25,6 +25,6 @@ const root=path.resolve(__dirname,'..');
   for(const file of ['manifest.json','app.html','app.css','background.js','site.js','README.md','THIRD_PARTY_NOTICES.txt'])fs.copyFileSync(path.join(root,file),path.join(destination,file));
   for(const directory of ['core','dist','vendor'])fs.cpSync(path.join(root,directory),path.join(destination,directory),{recursive:true});
   fs.mkdirSync(path.join(destination,'docs'),{recursive:true});
-  for(const file of ['validation-v040.md','validation-v050.md','model-toplulugu.md'])fs.copyFileSync(path.join(root,'docs',file),path.join(destination,'docs',file));
+  for(const file of ['validation-v040.md','validation-v050.md','validation-v052.md','model-toplulugu.md'])fs.copyFileSync(path.join(root,'docs',file),path.join(destination,'docs',file));
   console.log('Kurulum paketi hazır: '+destination);
 })().catch(error=>{console.error(error);process.exitCode=1;});

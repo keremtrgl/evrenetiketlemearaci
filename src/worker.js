@@ -1,8 +1,9 @@
-import {pipeline,env} from '@huggingface/transformers';
+import {pipeline,env,RawImage} from '@huggingface/transformers';
 import * as ort from 'onnxruntime-web/wasm';
 import classifier from '../core/classifier.js';
 import network from '../core/network.js';
 import bank from '../core/model-bank.js';
+import image from '../core/image.js';
 
 const nativeFetch=globalThis.fetch.bind(globalThis);
 globalThis.fetch=(input,options={})=>{
@@ -38,8 +39,9 @@ self.onmessage=async({data:m})=>{
   busy=true;
   try{
     if(m.type==='DETECT'){
+      const input=await RawImage.fromBlob(image.toBlob(m.image));
       if(!detector) detector=await pipeline('object-detection','Xenova/yolos-tiny',{dtype:'q8',device:'wasm',progress_callback:p=>tell(m.id,'progress',{progress:{status:p.status,file:p.file||'',progress:p.progress||0}})});
-      const results=await detector(m.image,{threshold:m.threshold});
+      const results=await detector(input,{threshold:m.threshold});
       tell(m.id,'result',{results,model:'Xenova/yolos-tiny'});
     }else if(m.type==='LOAD_OWN_MODEL'){
       if(typeof m.modelId!=='string'||!m.modelId||!bank.domains.includes(m.domain))throw new Error('Model kimliği ve alanı gerekli');
@@ -64,7 +66,7 @@ self.onmessage=async({data:m})=>{
       if(!Array.isArray(m.modelIds)||!m.modelIds.length||m.modelIds.length>3||new Set(m.modelIds).size!==m.modelIds.length)throw new Error('En az bir, en fazla üç uzman seç');
       const entries=m.modelIds.map(id=>{const e=sessions.get(id);if(!e||e.domain!==m.domain)throw new Error('Uzman modeli veya alanı uygun değil');return [id,e];});
       if(typeof m.image!=='string'||!m.image.startsWith('data:image/'))throw new Error('Yalnız bellek içi görüntü kabul edilir');
-      const blob=await (await fetch(m.image)).blob();const bitmap=await createImageBitmap(blob);
+      const bitmap=await createImageBitmap(image.toBlob(m.image));
       const votes=[];
       try{for(const [modelId,entry]of entries)votes.push({modelId,name:entry.name,results:await classify(entry,bitmap)});}
       finally{bitmap.close();}

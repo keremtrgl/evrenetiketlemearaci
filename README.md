@@ -1,12 +1,22 @@
 # Evren Etiketleme Aracı
 
-[Kerem](https://github.com/keremtrgl) · [Hugging Face](https://huggingface.co/KeremTT) · v0.5.1 beta.1
+[Kerem](https://github.com/keremtrgl) · [Hugging Face](https://huggingface.co/KeremTT) · v0.5.2 beta.1
 
 Evren'de açık fotoğrafı bilgisayarındaki modellerle inceleyen Chrome uzantısı. Kaç görsel üzerinde çalışacağını ve en yüksek hızı seçebilirsin. Yeterli uzman uzlaşması ve sınıf eşlemesi varsa kutuları Evren'in normal çizim aracıyla çizer, normal kayıt adımını bekler ve sonraki görsele geçer. Emin olamadıklarını incelemeye ayırır.
 
 **Ücretli Otomatik Etiketle, AI Meta, SAM, Akıllı Seçim veya Evren çıkarım API'sini kullanmaz. API anahtarı istemez.** Günlük LLM token hakkın bu akışta kullanılmaz.
 
 Bu sürüm beta. Uygulama testlerinde iki görsel için çizim, kayıt ve geçiş sırası doğrulandı. Evren'de normal Kutu aracıyla çizilen bir kutunun sayfa yenilendikten sonra kaldığı da kontrol edildi. **Yeni uzantının kurulu Chrome'daki otomatik akışı henüz uçtan uca doğrulanmadı.** Önce küçük bir deneme yap. Test ayrıntıları [doğrulama notunda](docs/validation-v050.md).
+
+## v0.5.2 görsel açma düzeltmesi
+
+“Failed to fetch” hatası yalnız internet bağlantısından kaynaklanmıyordu. Önceki sürüm bellekteki görseli fetch ile açıyordu; uzantının connect-src kuralı data: adreslerinin bu yolla okunmasına izin vermiyordu. Görsel açma, uzman sınıflandırma ve genel tespit yolları artık bellek baytlarını doğrudan çözüyor. Güvenlik kuralı genişletilmedi; görseli başka sunucuya gönderme veya ücretli API eklenmedi.
+
+Hata aynı CSP ile tarayıcı önizlemesinde yeniden üretildi. Düzeltmeden sonra 640×480 deneme görseli açıldı, gerçek Anadolu1000 ve Anadolu500 ağırlıkları WASM motorunda yüklendi ve aynı görsel için tahmin verdi. Genel kutu modeli de çalışıp deneme çiziminde sıfır öneri döndürdü. Bu, yerel çalışma kontrolü; model doğruluğu veya kurulu Chrome uzantısının Evren otomasyonu için uçtan uca test değildir. 66 test geçti.
+
+Anadolu paketlerinde Turdus_merula / turdus_merula gibi yazım farkları var. Her iki adı da açıkça aynı mevcut Evren sınıfına eşlersen otomasyon bunu ortak sınıf sayar. Araç kendi kendine isim benzetmesi yapmaz; belirsizlik ve yüksek puan şartları aynen sürer. Elle öneri ekranında ham model adları ayrı gösterilir.
+
+Mevcut klasörü güncelle, uzantı kartındaki yenileye bas, panelin içinde v0.5.2 yazdığını kontrol et ve Evren sekmesini yenile. Ayrıntılar [v0.5.2 doğrulama notunda](docs/validation-v052.md).
 
 ## v0.5.1 bağlantı düzeltmesi
 
@@ -18,7 +28,7 @@ Mevcut kurulum klasörüne güncelleme yaptıysan Chrome Uzantılar ekranında k
 
 ## Kurulum
 
-1. [Sürümler](https://github.com/keremtrgl/evrenetiketlemearaci/releases) bölümünden **v0.5.1-beta.1** hazır ZIP paketini indir.
+1. [Sürümler](https://github.com/keremtrgl/evrenetiketlemearaci/releases) bölümünden **v0.5.2-beta.1** hazır ZIP paketini indir.
 2. ZIP'e sağ tıkla ve **Tümünü ayıkla** de. İçinde `manifest.json` bulunan klasörü bul.
 3. Chrome adres çubuğuna `chrome://extensions` yaz. Sağ üstten **Geliştirici modu**nu aç.
 4. **Paketlenmemiş öğe yükle** düğmesine basıp bu klasörü seç.
