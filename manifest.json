@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Kerem · Yerel Etiketleme",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "minimum_chrome_version": "120",
   "author": "Kerem | GitHub: https://github.com/keremtrgl | Hugging Face: https://huggingface.co/KeremTT",
   "homepage_url": "https://github.com/keremtrgl/evrenetiketlemearaci",
@@ -11,7 +11,7 @@
   "host_permissions": ["https://huggingface.co/*", "https://*.huggingface.co/*", "https://*.hf.co/*"],
   "background": {"service_worker": "background.js"},
   "action": {"default_title": "Yerel etiketleme atölyesini aç"},
-  "content_security_policy": {"extension_pages": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; object-src 'none'; connect-src 'self' https://huggingface.co https://*.huggingface.co https://*.hf.co; img-src 'self' data: blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'"},
+  "content_security_policy": {"extension_pages": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; object-src 'none'; connect-src 'self' https://huggingface.co https://*.huggingface.co https://*.hf.co; img-src 'self' data: blob:; worker-src 'self'; style-src 'self' 'unsafe-inline'"},
   "content_scripts": [{
     "matches": ["https://evren.ssyz.org.tr/*"],
     "js": ["core/annotations.js", "site.js"],

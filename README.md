@@ -1,6 +1,8 @@
 # Kerem · Yerel Etiketleme
 
-[Kerem](https://github.com/keremtrgl) · [Hugging Face](https://huggingface.co/KeremTT) · v0.4.0 beta
+[Kerem](https://github.com/keremtrgl) · [Hugging Face](https://huggingface.co/KeremTT) · v0.4.1 beta
+
+v0.4.0 paketinin Chrome yüklemesini engelleyen `worker-src blob:` manifest hatası v0.4.1'de düzeltildi. [Yeni paketi kullan](https://github.com/keremtrgl/evrenetiketlemearaci/releases/tag/v0.4.1-beta.1). Bu düzeltme, canlı site aktarımının doğrulandığı anlamına gelmez.
 
 Evren'de açık fotoğrafı yerel modellerle incelemek için Chrome uzantısı. Yan panelde kutu önerileri hazırlayabilir, birden fazla uzman modelin tür tahminlerini karşılaştırabilir ve kontrol ettiğin kutuyu Evren'in normal çizim aracına aktarabilirsin.
 
@@ -18,7 +20,7 @@ Model dosyaları fotoğraflardan ayrı. Genel nesne modeli ilk kullanımda Huggi
 
 ## Kurulum
 
-1. [Sürümler](https://github.com/keremtrgl/evrenetiketlemearaci/releases) bölümünden **v0.4.0-beta.1** hazır uzantı ZIP'ini indir.
+1. [Sürümler](https://github.com/keremtrgl/evrenetiketlemearaci/releases) bölümünden **v0.4.1-beta.1** hazır uzantı ZIP'ini indir.
 2. ZIP'e sağ tıkla, **Tümünü ayıkla** de.
 3. Chrome adres çubuğuna `chrome://extensions` yaz.
 4. **Geliştirici modu**nu aç.
