@@ -22,10 +22,12 @@ Hesapta incelenen 15 model aynı görevi yapmıyor. Anadolu1000/500, bitki38, tt
 6. Puanları ham halde farklı modeller arasında karşılaştırıp en büyük olanı seçme. Kalibrasyon, ortak test kümesi ve yanlış pozitifler değerlendirilsin.
 7. Hız, bellek, kapsam dışı örneklerde reddetme ve sınıf bazlı kalite raporu çıkar. İyileşme yoksa daha karmaşık topluluğu yayına alma.
 
-## v0.3.0’daki gerçek durum
+## v0.4.0 betadaki gerçek durum
 
-Yerel genel nesne kutuları ve isteğe bağlı tek ONNX sınıflandırıcı yükleme yolu var. Anadolu ağırlıkları bu repoya eklenmedi, ücretli dışa aktarım veya çıkarım çağrısı yapılmadı. Yükleyici NCHW RGB giriş, giriş boyutu ve sınıf sayısını doğrular. Kullanıcının gerçek Anadolu ONNX ağırlıklarıyla uçtan uca doğrulama henüz yapılmadı.
+Yerel genel nesne kutuları ve en fazla üç ONNX sınıflandırıcı içeren bir model bankası var. Alan seçimi ilgili uzmanları belirler. İlk tahminler aynı sınıf adıyla, en az 0,75 puan ve ikinci tahmine en az 0,15 farkla birleşiyorsa güçlü ortak öneri gösterilir; puanlar ortalanmaz. Farklı sınıflar ve belirsizlik ayrı gösterilir. Kutu başına en fazla 20 yeni kutunun uzmanlarla incelendiği bir akış var. Son karar ve site sınıfı eşlemesi kullanıcıda.
 
-Bu sürüm modelleri tek ağırlıkta birleştirmez, bütün uzmanları aynı anda çalıştırmaz ve kendi kendine yeni model eğitmez. Görevlerine göre birlikte kullanma yaklaşımı bunun üzerine kurulabilir.
+Mevcut hazır Anadolu1000 ve Anadolu500 ONNX dosyaları alındı; uzaktan dönüştürme işi başlatılmadı. Metadata'dan gerçek 1000/500 sınıf listeleri ve 384 giriş boyutu çıkarıldı. İki ağırlık aynı ONNX Runtime Web WASM çalışma zamanında Node.js altında birlikte yüklenip sentetik girdide çalıştı. Canlı Chrome ve gerçek fotoğraflarda kalite değerlendirmesi tamamlanmadı. Ağırlıklar repoya konulmadı; kullanıcı için yerelde ayrı hazırlandı.
+
+Bu sürüm modelleri tek ağırlıkta birleştirmez ve kendi kendine yeni model eğitmez. Sınıflandırma modelleri birlikte çalışabilir; kullanıcının tespit/segmentasyon ONNX modelleri için görev çözücüleri henüz yok. Fotoğraftaki genel nesneyi yerel YOLOS modeli bulur; mikroskop gibi alanlarda kutuyu elle seçmek gerekebilir.
 
 Kaynaklar: [Model soups](https://arxiv.org/abs/2203.05482), [Fisher ağırlıklı birleştirme](https://arxiv.org/abs/2111.09832), [Ultralytics model toplulukları](https://docs.ultralytics.com/yolov5/tutorials/model-ensembling).

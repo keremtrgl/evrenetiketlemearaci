@@ -1,10 +1,14 @@
-const A=globalThis.EvrenAnnotations,C=globalThis.EvrenClassifier;
+const A=globalThis.EvrenAnnotations,C=globalThis.EvrenClassifier,B=globalThis.EvrenModelBank;
 const $=id=>document.getElementById(id);
 const canvas=$('canvas'),ctx=canvas.getContext('2d');
 let items=[],current=-1,bitmap=null,selected=null,tool='select',draft=[],drag=null,zoom=0,busy=false,stopped=false,worker=null,sequence=0,ownReady=false;
 const calls=new Map();
+const experts=[];
+const cloudMode=new URL(location.href).searchParams.get('mode')==='evren';
+document.body.classList.toggle('cloud-mode',cloudMode);
 let dbPromise;
 let openRequest=0;
+let siteWriting=false;
 function db(){
   if(!dbPromise) dbPromise=new Promise((resolve,reject)=>{
     const request=indexedDB.open('kerem-local-labels-v1',1);
@@ -13,10 +17,10 @@ function db(){
   });return dbPromise;
 }
 async function getDraft(id){const database=await db();return new Promise((resolve,reject)=>{const r=database.transaction('drafts').objectStore('drafts').get(id);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}
-function record(item){return {id:item.id,name:item.name,width:item.width,height:item.height,coordinateSpace:item.coordinateSpace||'original-image',source:item.source||null,annotations:structuredClone(item.annotations),updatedAt:Date.now()};}
+function record(item){return {id:item.id,name:item.name,width:item.width,height:item.height,coordinateSpace:item.coordinateSpace||'original-image',source:item.source||null,annotations:structuredClone(item.annotations),transfers:structuredClone(item.transfers||{}),updatedAt:Date.now()};}
 async function save(item){
-  try{const database=await db();const data=record(item);await new Promise((resolve,reject)=>{const t=database.transaction('drafts','readwrite');t.objectStore('drafts').put(data);t.oncomplete=resolve;t.onerror=()=>reject(t.error);t.onabort=()=>reject(t.error);});$('save-state').textContent='Taslak kaydedildi';}
-  catch{$('save-state').textContent='Kayıt başarısız';status('Yerel taslak kaydedilemedi. Etiketlerini dosyaya aktar.',true);}
+  try{const database=await db();const data=record(item);await new Promise((resolve,reject)=>{const t=database.transaction('drafts','readwrite');t.objectStore('drafts').put(data);t.oncomplete=resolve;t.onerror=()=>reject(t.error);t.onabort=()=>reject(t.error);});$('save-state').textContent='Taslak kaydedildi';return true;}
+  catch{$('save-state').textContent='Kayıt başarısız';status('Yerel taslak kaydedilemedi. Etiketlerini dosyaya aktar.',true);return false;}
 }
 function status(message,error=false){$('status').textContent=message;$('status').classList.toggle('error',error);}
 function active(){return items[current];}
@@ -29,9 +33,21 @@ async function imageData(item){return item.dataUrl||dataURL(item.file);}
 async function hash(blob){const bytes=await blob.arrayBuffer();const digest=await crypto.subtle.digest('SHA-256',bytes);return [...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,'0')).join('');}
 function setBusy(value){
   busy=value;
-  for(const id of ['detect','batch','capture','demo','load-own','files','own-model','own-labels','input-size']) $(id).disabled=value;
-  $('stop').disabled=!value;$('classify').disabled=value||!ownReady;
+  for(const id of ['detect','batch','capture','demo','load-own','files','own-model','own-labels','own-pack','input-size','domain','pipeline','site-draw','site-class','allow-existing']) $(id).disabled=value;
+  $('stop').disabled=!value||siteWriting;$('classify').disabled=value||!ownReady;renderBank();
 }
+function renderBank(){
+  $('model-bank').replaceChildren();
+  for(const expert of experts){
+    const row=document.createElement('div');row.className='expert';
+    const label=document.createElement('label'),check=document.createElement('input');check.type='checkbox';check.checked=expert.enabled;check.disabled=busy;check.onchange=()=>{expert.enabled=check.checked;renderBank();};label.append(check,document.createTextNode(expert.name+' · '+expert.domain+' · '+expert.classes+' sınıf'));
+    const remove=document.createElement('button');remove.textContent='Kaldır';remove.disabled=busy;remove.onclick=async()=>{setBusy(true);try{await run('UNLOAD_MODEL',{modelId:expert.id});experts.splice(experts.indexOf(expert),1);}catch(e){status(e.message,true);}finally{ownReady=experts.length>0;setBusy(false);}};
+    row.append(label,remove);$('model-bank').append(row);
+  }
+  const ready=experts.some(e=>e.enabled&&e.domain===$('domain').value);
+  $('classify').disabled=busy||!ready;$('pipeline').disabled=busy||!ready;
+}
+$('domain').onchange=renderBank;
 function model(){
   if(worker) return worker;
   worker=new Worker('dist/worker.js',{type:'module'});
@@ -46,12 +62,12 @@ function model(){
   };
   worker.onerror=()=>{
     for(const pending of calls.values())pending.reject(new Error('Yerel motor başlatılamadı. Uzantıyı yenileyip tekrar dene.'));
-    calls.clear();worker?.terminate();worker=null;ownReady=false;$('classify').disabled=true;
+    calls.clear();worker?.terminate();worker=null;ownReady=false;experts.length=0;renderBank();
   };return worker;
 }
 function run(type,payload,transfer=[]){return new Promise((resolve,reject)=>{const id=++sequence;calls.set(id,{resolve,reject});try{model().postMessage({id,type,...payload},transfer);}catch(e){calls.delete(id);reject(e);}});}
 function cancel(){
-  stopped=true;worker?.terminate();worker=null;ownReady=false;
+  stopped=true;worker?.terminate();worker=null;ownReady=false;experts.length=0;renderBank();
   for(const p of calls.values())p.reject(new Error('Yerel işlem durduruldu'));calls.clear();
   $('own-status').textContent='Motor durduruldu. Tür önerisi için modeli yeniden yükle.';
   $('progress').hidden=true;status('Yerel işlem durduruldu. Mevcut etiketler korundu.');
@@ -72,7 +88,7 @@ function renderAnnotations(){
     const row=document.createElement('div');row.className='annotation'+(a.id===selected?' active':'');
     const check=document.createElement('input');check.type='checkbox';check.checked=!!a.reviewed;check.setAttribute('aria-label',a.label+' incelendi');check.disabled=busy;check.onchange=()=>{snapshot();a.reviewed=check.checked;changed();};
     const button=document.createElement('button');button.textContent=a.label;button.disabled=busy;button.onclick=()=>{selected=a.id;$('class-name').value=a.label;renderAnnotations();draw();};
-    const score=document.createElement('small');score.textContent=a.score===null||a.score===undefined?'Elle':Math.round(a.score*100)+'% öneri';
+    const score=document.createElement('small');score.textContent=a.ensemble?({agreement:'Uzlaşma',single:'Tek uzman',uncertain:'Belirsiz',disagreement:'Uyuşmazlık'}[a.ensemble.state]):a.score===null||a.score===undefined?'Elle':Math.round(a.score*100)+'% öneri';
     row.append(check,button,score);$('annotations').append(row);
   }
   $('undo').disabled=busy||!item?.undo.length;$('redo').disabled=busy||!item?.redo.length;
@@ -109,13 +125,17 @@ async function open(index){
   if(nextBitmap.width*nextBitmap.height>25000000){nextBitmap.close();throw new Error('Görsel 25 megapikselden büyük. Önce küçültün.');}
   item.width=nextBitmap.width;item.height=nextBitmap.height;
   if(!item.restored){
-    try{const stored=await getDraft(item.id);if(stored && stored.width===item.width && stored.height===item.height){item.annotations=stored.annotations.filter(a=>{try{return !!A.validate(a);}catch{return false;}});status('Yerel etiket taslağı geri yüklendi.');}}catch{status('Yerel kayıt okunamadı; çalışmaya devam edebilirsin.',true);}item.restored=true;
+    try{const stored=await getDraft(item.id);if(stored && stored.width===item.width && stored.height===item.height){item.annotations=stored.annotations.filter(a=>{try{return !!A.validate(a);}catch{return false;}});item.transfers=stored.transfers||{};status('Yerel etiket taslağı geri yüklendi.');}item.storageHealthy=true;}catch{item.storageHealthy=false;status('Yerel kayıt okunamadı; siteye aktarım kapalı. Görseli yeniden alıp dene.',true);}item.restored=true;
   }
   if(request!==openRequest){nextBitmap.close();return;}
   current=index;bitmap?.close();bitmap=nextBitmap;selected=null;draft=[];drag=null;zoom=0;
   canvas.width=bitmap.width;canvas.height=bitmap.height;canvas.hidden=false;$('empty').hidden=true;$('image-name').textContent=item.name;
   $('image-info').textContent=`${item.width} × ${item.height} · `+(item.coordinateSpace==='rendered-image'?'Evren tuvali — özgün boyutları kontrol et':'Özgün dosya');
   renderQueue();renderAnnotations();updateClasses();fit();draw();$('species').replaceChildren();
+  $('allow-existing').checked=false;$('site-class').replaceChildren();
+  const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent='Mevcut sınıfı seç';$('site-class').append(placeholder);
+  for(const name of item.siteClasses||[]){const o=document.createElement('option');o.value=name;o.textContent=name;$('site-class').append(o);}
+  $('site-state').textContent=item.sourceToken?`${item.source.position} · Evren'de ${item.existingCount} mevcut etiket · fotoğraf yalnız bellekte`:'Evren’den alınmış görsel yok.';
 }
 async function addFiles(files){
   if(busy)return;
@@ -169,6 +189,7 @@ canvas.ondblclick=()=>tool==='polygon'&&finishPolygon();
 canvas.onpointercancel=()=>{if(drag?.id){const a=active().annotations.find(a=>a.id===drag.id);if(a)a.geometry=drag.original;}drag=null;draw();};
 async function detectItem(item){
   const data=await imageData(item);status(item.name+' yerel modelle analiz ediliyor…');
+  if(stopped)throw new Error('Yerel işlem durduruldu');
   const result=await run('DETECT',{image:data,threshold:Number($('threshold').value)});
   if(stopped)return;
   const {annotations,rejected}=A.fromDetections(result.results,item.width,item.height,Number($('threshold').value));
@@ -200,15 +221,40 @@ $('demo').onclick=async()=>{
   items.push({id,name:'deneme-gorseli.png',dataUrl:url,annotations:[],undo:[],redo:[],coordinateSpace:'original-image'});await open(items.length-1);
 };
 $('capture').onclick=async()=>{
+  if(busy)return;setBusy(true);
   try{
-    const id=Number(new URL(location.href).searchParams.get('sourceTab'));
-    if(!id||!globalThis.chrome?.tabs)throw new Error('Evren etiketleme sekmesindeyken uzantı simgesine tıkla; ardından Evren’den al.');
+    if(!globalThis.chrome?.tabs)throw new Error('Evren etiketleme sekmesindeyken uzantı simgesine tıkla; ardından Evren’den al.');
+    const explicit=Number(new URL(location.href).searchParams.get('sourceTab'));
+    const tab=explicit?{id:explicit}:(await chrome.tabs.query({active:true,currentWindow:true}))[0];const id=tab?.id;
+    if(!id)throw new Error('Evren etiketleme sekmesini aç');
     const result=await chrome.tabs.sendMessage(id,{type:'CAPTURE_LOCAL_IMAGE'});
     if(!result?.ok)throw new Error(result?.error||'Tuval okunamadı');
-    const image=result.image;const itemId=await hash(new Blob([image.dataUrl]));const old=items.findIndex(i=>i.id===itemId);
-    if(old>=0){await open(old);return;}if(items.length>=200)throw new Error('200 görsellik çalışma sınırına ulaşıldı');
-    items.push({...image,id:itemId,annotations:[],undo:[],redo:[]});await open(items.length-1);status('Tuval belleğe alındı. Evren’de hiçbir etiket değiştirilmedi.');
-  }catch(e){status(e.message,true);}
+    const image=result.image;const itemId=await hash(new Blob([JSON.stringify(image.source),image.dataUrl]));
+    if(cloudMode&&active()&&!(await save(active())))throw new Error('Önceki taslak kaydedilemedi; fotoğraf değiştirilmedi');
+    const old=items.findIndex(i=>i.id===itemId);
+    if(old>=0){Object.assign(items[old],image,{sourceTab:id});await open(old);return;}if(items.length>=200)throw new Error('200 görsellik çalışma sınırına ulaşıldı');
+    items.push({...image,id:itemId,sourceTab:id,annotations:[],undo:[],redo:[]});await open(items.length-1);
+    if(cloudMode){items=[active()];current=0;renderQueue();}
+    status('Açık fotoğraf belleğe alındı. Evren’de hiçbir etiket değiştirilmedi.');
+  }catch(e){status(e.message,true);}finally{setBusy(false);}
+};
+$('site-draw').onclick=async()=>{
+  if(busy)return;const item=active(),a=item?.annotations.find(a=>a.id===selected);
+  if(!item?.sourceToken||!a){status('Evren’den görsel al ve aktaracağın etiketi seç.',true);return;}
+  if(!item.storageHealthy){status('Aktarım geçmişi okunamadı. Görseli yeniden alıp dene.',true);return;}
+  if(a.type!=='box'){status('Bu beta Evren’e yalnız kutu aktarır. Poligon aktarımı canlı doğrulama bekliyor.',true);return;}
+  if(!a.reviewed){status('Önce seçili etiketin sınırlarını inceleyip incelendi kutusunu işaretle.',true);return;}
+  item.transfers||={};
+  if(Object.hasOwn(item.transfers,a.id)){status('Bu etiketin aktarımı zaten denendi. Evren tarafını kontrol et; tekrar gönderilmedi.',true);return;}
+  if(!$('site-class').value){status('Evren’deki mevcut sınıfı seç.',true);return;}
+  siteWriting=true;setBusy(true);
+  try{
+    item.transfers[a.id]={state:'pending',source:item.source,className:$('site-class').value,at:Date.now()};
+    if(!(await save(item))){delete item.transfers[a.id];throw new Error('Aktarım notu kaydedilemedi. Siteye çizim yapılmadı');}
+    const result=await chrome.tabs.sendMessage(item.sourceTab,{type:'DRAW_LOCAL_ANNOTATION',token:item.sourceToken,annotation:structuredClone(a),className:$('site-class').value,allowExisting:$('allow-existing').checked});
+    if(!result?.ok){if(result?.attempted===false)delete item.transfers[a.id];else item.transfers[a.id].state='uncertain';await save(item);throw new Error(result?.error||'Aktarım sonucu belirsiz. Evren tarafını kontrol et; tekrar gönderilmedi.');}
+    item.transfers[a.id].state='drawn';await save(item);status(result.message);$('site-state').textContent='Çizim sayacı doğrulandı. Evren’de kontrol et ve Ctrl+S ile kaydet.';
+  }catch(e){status(e.message,true);}finally{siteWriting=false;setBusy(false);}
 };
 $('detect').onclick=()=>doDetect(false);$('batch').onclick=()=>doDetect(true);$('stop').onclick=cancel;
 $('previous').onclick=()=>!busy&&open(current-1).catch(e=>status(e.message,true));$('next').onclick=()=>!busy&&open(current+1).catch(e=>status(e.message,true));
@@ -226,27 +272,86 @@ $('load-own').onclick=async()=>{
   if(!file||!labelsFile){status('ONNX modeli ve sıralı sınıf listesini seç.',true);return;}
   if(file.size>200000000||labelsFile.size>2000000){status('Model en fazla 200 MB, sınıf listesi en fazla 2 MB olabilir.',true);return;}
   setBusy(true);stopped=false;
-  try{const labels=await labelsFile.text();C.parseLabels(labels);const buffer=await file.arrayBuffer();const result=await run('LOAD_OWN_MODEL',{buffer,labels,size:Number($('input-size').value)},[buffer]);ownReady=true;$('own-status').textContent=file.name+' · '+result.classes+' sınıf · yalnız yerel';status('Kendi modelin yerel belleğe yüklendi.');}
+  try{
+    await loadExpert(file,labelsFile,Number($('input-size').value),$('domain').value);status('Uzman model topluluğa eklendi.');
+  }
   catch(e){status(e.message,true);}finally{setBusy(false);}
 };
-$('classify').onclick=async()=>{
-  if(!bitmap||!ownReady)return;const item=active(),target=item.annotations.find(a=>a.id===selected);
+async function loadExpert(file,labelsFile,size,domain,expectedHash){
+  if(file.size>200000000||labelsFile.size>2000000)throw new Error('Model en fazla 200 MB, sınıf listesi en fazla 2 MB olabilir');
+  if(!B.domains.includes(domain))throw new Error('Geçersiz model alanı');
+  const labels=await labelsFile.text();C.parseLabels(labels);const id=await hash(file);
+  if(expectedHash&&expectedHash!==id)throw new Error('Paketin model özeti uyuşmuyor');
+  if(experts.some(e=>e.id===id))throw new Error('Bu model zaten yüklü');
+  if(experts.length>=3||experts.reduce((n,e)=>n+e.bytes,0)+file.size>300000000)throw new Error('En fazla 3 model ve toplam 300 MB ağırlık yüklenebilir');
+  if(stopped)throw new Error('Model yükleme durduruldu');
+  const buffer=await file.arrayBuffer();if(stopped)throw new Error('Model yükleme durduruldu');
+  const result=await run('LOAD_OWN_MODEL',{buffer,labels,size,modelId:id,domain,name:file.name},[buffer]);
+  if(stopped)throw new Error('Model yükleme durduruldu');
+  experts.push({id,domain,name:file.name,classes:result.classes,bytes:file.size,enabled:true});ownReady=true;renderBank();$('own-status').textContent=file.name+' · '+result.classes+' sınıf · yalnız yerel';
+}
+$('own-pack').onchange=async e=>{
+  if(busy)return;const files=[...e.target.files];const infos=files.filter(f=>f.name.endsWith('.info.json'));
+  if(!infos.length||infos.length>3){status('En fazla 3 modelin info.json, labels.json ve ONNX dosyalarını birlikte seç.',true);return;}
+  setBusy(true);stopped=false;
+  try{
+    for(const infoFile of infos){
+      if(infoFile.size>10000)throw new Error('Paket bilgi dosyası çok büyük');const info=JSON.parse(await infoFile.text());
+      const base=infoFile.name.slice(0,-10),models=files.filter(f=>f.name===base+'.onnx'),labels=files.filter(f=>f.name===base+'.labels.json');
+      if(models.length!==1||labels.length!==1||info.task!=='classify'||!Array.isArray(info.imgsz)||info.imgsz.length!==2||info.imgsz[0]!==info.imgsz[1]||!/^[a-f0-9]{64}$/.test(info.sha256||''))throw new Error('Paket dosyaları eksik veya uyumsuz');
+      await loadExpert(models[0],labels[0],info.imgsz[0],info.domain||'biodiversity',info.sha256);
+    }
+    status(infos.length+' uzman model paketten yüklendi.');
+  }catch(error){status(error.message+' Daha önce yüklenen modeller listede kalır.',true);}finally{setBusy(false);}
+};
+async function askExperts(target){
+  const domain=$('domain').value,modelIds=B.route(experts,domain).map(e=>e.id);
   const image=new OffscreenCanvas(bitmap.width,bitmap.height),c=image.getContext('2d');c.drawImage(bitmap,0,0);
   let resultCanvas=image;
   if(target){const [x1,y1,x2,y2]=A.bounds(target);resultCanvas=new OffscreenCanvas(Math.max(1,Math.round((x2-x1)*bitmap.width)),Math.max(1,Math.round((y2-y1)*bitmap.height)));resultCanvas.getContext('2d').drawImage(image,x1*bitmap.width,y1*bitmap.height,(x2-x1)*bitmap.width,(y2-y1)*bitmap.height,0,0,resultCanvas.width,resultCanvas.height);}
-  setBusy(true);stopped=false;
-  try{
-    const input=await dataURL(await resultCanvas.convertToBlob({type:'image/png'}));const result=await run('CLASSIFY',{image:input});$('species').replaceChildren();
-    for(const prediction of result.results){const b=document.createElement('button');b.textContent=prediction.label+' · %'+(prediction.score*100).toFixed(1);b.onclick=()=>{
+  const input=await dataURL(await resultCanvas.convertToBlob({type:'image/png'}));if(stopped)throw new Error('Yerel işlem durduruldu');
+  const result=await run('CLASSIFY',{image:input,modelIds,domain});
+  return result.ensemble||B.summarize([{modelId:modelIds[0],name:experts.find(e=>e.id===modelIds[0]).name,results:result.results}]);
+}
+function showPredictions(ensemble,item,target){
+  $('species').replaceChildren();
+  const summary=document.createElement('p');summary.className='hint';summary.textContent={agreement:'Uzmanlar aynı güçlü sınıfı önerdi. Yine de sınırı ve türü incele.',single:'Tek uzman sonucu. Bağımsız doğrulama yok.',uncertain:'Güven veya ilk iki sınıfın farkı düşük. İnceleme gerekli.',disagreement:'Uzmanlar farklı sınıflar önerdi. Otomatik tür ataması yapılmadı.'}[ensemble.state];$('species').append(summary);
+  for(const vote of ensemble.votes){
+    const title=document.createElement('h3');title.textContent=vote.name||vote.modelId;$('species').append(title);
+    for(const prediction of vote.results){const b=document.createElement('button');b.textContent=prediction.label+' · %'+(prediction.score*100).toFixed(1);b.onclick=()=>{
       if(active()!==item||busy)return;$('class-name').value=prediction.label;
       if(target){
         const currentTarget=item.annotations.find(a=>a.id===target.id);
         if(!currentTarget){status('Önerinin hedef etiketi artık yok. Bir etiket seçip yeniden tür önerisi al.',true);return;}
-        snapshot();currentTarget.label=prediction.label;currentTarget.reviewed=false;changed();status('Seçili etiketin sınıfı değiştirildi; sınırlarını tekrar incele.');
+        snapshot();currentTarget.label=prediction.label;currentTarget.reviewed=false;currentTarget.ensemble=ensemble;changed();status('Seçili etiketin sınıfı değiştirildi; sınırlarını tekrar incele.');
       }else status('Tür önerisi seçildi. Yeni çizim bu sınıfla oluşturulacak.');
     };$('species').append(b);}
-    $('own-status').textContent=(target?'Seçili nesne':'Tüm görsel')+' · merkez kare kırpma · ilk 5 öneri';
+  }
+}
+$('classify').onclick=async()=>{
+  if(!bitmap||!ownReady)return;const item=active(),target=item.annotations.find(a=>a.id===selected);
+  setBusy(true);stopped=false;
+  try{
+    const result=await askExperts(target);showPredictions(result,item,target);
+    $('own-status').textContent=(target?'Seçili nesne':'Tüm görsel')+' · merkez kare kırpma · '+result.votes.length+' uzman';
   }catch(e){status(e.message,true);}finally{setBusy(false);}
+};
+$('pipeline').onclick=async()=>{
+  if(busy||!bitmap)return;const item=active();
+  try{B.route(experts,$('domain').value);}catch(e){status(e.message,true);return;}
+  setBusy(true);stopped=false;
+  try{
+    const previous=new Set(item.annotations.map(a=>a.id));await detectItem(item);if(stopped)return;
+    const targets=item.annotations.filter(a=>!previous.has(a.id)).slice(0,20);
+    if(!targets.length){status('Yeni kutu bulunamadı. Kutuyu elle çizebilir, seçip uzmanlara sorabilirsin.');return;}
+    snapshot();let inspected=0;
+    for(const a of targets){
+      if(stopped)break;status((++inspected)+' / '+targets.length+' nesne uzmanlarla inceleniyor…');
+      a.ensemble=await askExperts(a);if(stopped)break;
+      if(a.ensemble.label){a.label=a.ensemble.label;a.score=null;}a.reviewed=false;await save(item);
+    }
+    changed();status(targets.length+' kutu uzmanlara soruldu. Uyuşmazlıkları ve sınırları incele. Evren’e henüz çizilmedi.');
+  }catch(e){status(e.message,true);if(active()===item)changed();}finally{setBusy(false);$('progress').hidden=true;renderAnnotations();}
 };
 $('export').onclick=()=>{
   try{
@@ -273,6 +378,6 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Delete')$('remove').click();
   if(['v','b','p'].includes(e.key.toLowerCase()))setTool({v:'select',b:'box',p:'polygon'}[e.key.toLowerCase()]);
 });
-document.addEventListener('dragover',e=>e.preventDefault());document.addEventListener('drop',e=>{e.preventDefault();addFiles(e.dataTransfer.files).catch(err=>status(err.message,true));});
+document.addEventListener('dragover',e=>e.preventDefault());document.addEventListener('drop',e=>{e.preventDefault();if(cloudMode){status('Bu panelde Evren’den al düğmesini kullan.');return;}addFiles(e.dataTransfer.files).catch(err=>status(err.message,true));});
 window.addEventListener('beforeunload',e=>{if(busy){e.preventDefault();e.returnValue='';}});
-renderQueue();renderAnnotations();
+renderQueue();renderAnnotations();renderBank();

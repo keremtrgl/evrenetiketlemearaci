@@ -4,7 +4,7 @@ const fs=require('node:fs');
 const {JSDOM}=require('jsdom');
 const source=fs.readFileSync(require('node:path').join(__dirname,'../site.js'),'utf8');
 
-test('Yakalama isteği ücretli düğmelere basmaz ve siteye yazım komutu kabul etmez',async()=>{
+test('Tanımsız komut ve başarısız yakalama ücretli düğmeleri çağırmaz',async()=>{
   const dom=new JSDOM('<body><header>kus.jpg</header><button>AI Meta Oluştur</button><button>Otomatik Etiketle</button><button aria-label="Akıllı Seçim">S</button></body>',{url:'https://evren.ssyz.org.tr/annotate/id?item=x',runScripts:'outside-only'});
   let listener;let clicks=0;
   dom.window.document.querySelectorAll('button').forEach(b=>b.onclick=()=>clicks++);

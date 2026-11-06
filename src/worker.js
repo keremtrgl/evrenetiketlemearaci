@@ -2,6 +2,7 @@ import {pipeline,env} from '@huggingface/transformers';
 import * as ort from 'onnxruntime-web/wasm';
 import classifier from '../core/classifier.js';
 import network from '../core/network.js';
+import bank from '../core/model-bank.js';
 
 const nativeFetch=globalThis.fetch.bind(globalThis);
 globalThis.fetch=(input,options={})=>{
@@ -18,7 +19,18 @@ env.backends.onnx.wasm.proxy=false;
 ort.env.wasm.wasmPaths=new URL('../vendor/',import.meta.url).href;
 ort.env.wasm.numThreads=1;
 ort.env.wasm.proxy=false;
-let detector=null,ownSession=null,ownLabels=[],ownSize=384;
+let detector=null;
+const sessions=new Map();
+async function classify(entry,bitmap){
+  const {session,labels,size}=entry;
+  const canvas=new OffscreenCanvas(size,size),ctx=canvas.getContext('2d');
+  const side=Math.min(bitmap.width,bitmap.height);
+  ctx.drawImage(bitmap,(bitmap.width-side)/2,(bitmap.height-side)/2,side,side,0,0,size,size);
+  const data=classifier.rgbToCHW(ctx.getImageData(0,0,size,size).data,size,size);
+  const tensor=new ort.Tensor('float32',data,[1,3,size,size]);let output;
+  try{output=await session.run({[session.inputNames[0]]:tensor});return classifier.topK(output[session.outputNames[0]].data,labels,5);}
+  finally{tensor.dispose();if(output)Object.values(output).forEach(v=>v.dispose());}
+}
 const tell=(id,type,data={})=>postMessage({id,type,...data});
 let busy=false;
 self.onmessage=async({data:m})=>{
@@ -30,6 +42,9 @@ self.onmessage=async({data:m})=>{
       const results=await detector(m.image,{threshold:m.threshold});
       tell(m.id,'result',{results,model:'Xenova/yolos-tiny'});
     }else if(m.type==='LOAD_OWN_MODEL'){
+      if(typeof m.modelId!=='string'||!m.modelId||!bank.domains.includes(m.domain))throw new Error('Model kimliği ve alanı gerekli');
+      if(sessions.has(m.modelId))throw new Error('Bu model zaten yüklü');
+      if(sessions.size>=3||[...sessions.values()].reduce((n,s)=>n+s.bytes,0)+m.buffer.byteLength>300000000)throw new Error('En fazla 3 model ve toplam 300 MB ağırlık yüklenebilir');
       const labels=classifier.parseLabels(m.labels);
       if(!Number.isInteger(m.size)||m.size<32||m.size>1024) throw new Error('Giriş boyutu 32–1024 arasında olmalı');
       const session=await ort.InferenceSession.create(m.buffer,{executionProviders:['wasm']});
@@ -38,24 +53,22 @@ self.onmessage=async({data:m})=>{
         await session.release();throw new Error('Model NCHW RGB girişine ve seçilen boyuta uygun değil');
       }
       const out=session.outputMetadata[0]?.shape;
-      if(session.outputNames.length!==1||!out||out.length!==2||((typeof out[1]==='number')&&out[1]!==labels.length)){
+      if(session.outputNames.length!==1||session.outputMetadata[0]?.type!=='float32'||!out||out.length!==2||((typeof out[0]==='number')&&out[0]!==1)||((typeof out[1]==='number')&&out[1]!==labels.length)){
         await session.release();throw new Error('Model sınıflandırma çıktısına veya sınıf listesine uygun değil');
       }
-      if(ownSession) await ownSession.release();ownSession=session;ownLabels=labels;ownSize=m.size;
-      tell(m.id,'result',{loaded:true,classes:labels.length});
+      sessions.set(m.modelId,{session,labels,size:m.size,bytes:m.buffer.byteLength,domain:m.domain,name:m.name});
+      tell(m.id,'result',{loaded:true,modelId:m.modelId,classes:labels.length});
+    }else if(m.type==='UNLOAD_MODEL'){
+      const entry=sessions.get(m.modelId);if(entry){await entry.session.release();sessions.delete(m.modelId);}tell(m.id,'result',{removed:true});
     }else if(m.type==='CLASSIFY'){
-      if(!ownSession) throw new Error('Önce ONNX modelini ve sıralı sınıf listesini yükleyin');
-      const blob=await (await nativeFetch(m.image)).blob();const bitmap=await createImageBitmap(blob);
-      const canvas=new OffscreenCanvas(ownSize,ownSize),ctx=canvas.getContext('2d');
-      const side=Math.min(bitmap.width,bitmap.height);
-      ctx.drawImage(bitmap,(bitmap.width-side)/2,(bitmap.height-side)/2,side,side,0,0,ownSize,ownSize);bitmap.close();
-      const data=classifier.rgbToCHW(ctx.getImageData(0,0,ownSize,ownSize).data,ownSize,ownSize);
-      const tensor=new ort.Tensor('float32',data,[1,3,ownSize,ownSize]);
-      const output=await ownSession.run({[ownSession.inputNames[0]]:tensor});
-      const result=output[ownSession.outputNames[0]];
-      const results=classifier.topK(result.data,ownLabels,5);
-      tensor.dispose();Object.values(output).forEach(v=>v.dispose());
-      tell(m.id,'result',{results,model:'Yerel ONNX sınıflandırıcı'});
+      if(!Array.isArray(m.modelIds)||!m.modelIds.length||m.modelIds.length>3||new Set(m.modelIds).size!==m.modelIds.length)throw new Error('En az bir, en fazla üç uzman seç');
+      const entries=m.modelIds.map(id=>{const e=sessions.get(id);if(!e||e.domain!==m.domain)throw new Error('Uzman modeli veya alanı uygun değil');return [id,e];});
+      if(typeof m.image!=='string'||!m.image.startsWith('data:image/'))throw new Error('Yalnız bellek içi görüntü kabul edilir');
+      const blob=await (await fetch(m.image)).blob();const bitmap=await createImageBitmap(blob);
+      const votes=[];
+      try{for(const [modelId,entry]of entries)votes.push({modelId,name:entry.name,results:await classify(entry,bitmap)});}
+      finally{bitmap.close();}
+      tell(m.id,'result',{results:votes[0].results,ensemble:bank.summarize(votes),model:'Yerel ONNX uzmanları'});
     }else throw new Error('İzin verilmeyen motor komutu');
   }catch(error){tell(m.id,'error',{message:error.message||'Yerel model işlemi başarısız'});}
   finally{busy=false;}
