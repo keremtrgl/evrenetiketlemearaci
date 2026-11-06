@@ -1,5 +1,14 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');
 const {create}=require('../core/site-client.js');
+test('Yan panel geçici activeTab izni olmadan Evren adresini okuyup tuvali alabilir',async()=>{
+  const manifest=require('../manifest.json');let captures=0;
+  const chrome={tabs:{get:async()=>manifest.host_permissions.includes('https://evren.ssyz.org.tr/*')?{id:5,url:'https://evren.ssyz.org.tr/annotate/id'}:{id:5},sendMessage:async(id,message)=>{assert.equal(id,5);assert.equal(message.type,'CAPTURE_LOCAL_IMAGE');captures++;return {ok:true,image:{sourceToken:'test'}};}}};
+  const result=await create(chrome).request(5,{type:'CAPTURE_LOCAL_IMAGE'});assert.equal(result.ok,true);assert.equal(captures,1);
+});
+test('Chrome adresi gizliyorsa sekme kapalı demek yerine site erişimi hatası verir',async()=>{
+  let sends=0;const chrome={tabs:{get:async()=>({id:5}),sendMessage:async()=>sends++}};
+  await assert.rejects(create(chrome).request(5,{type:'CAPTURE_LOCAL_IMAGE'}),/site erişimi/i);assert.equal(sends,0);
+});
 test('Eksik alıcıda yalnız okuma için paketli köprü bir kez kurulur',async()=>{
   let sends=0,injections=0;
   const chrome={tabs:{get:async()=>({url:'https://evren.ssyz.org.tr/annotate/id'}),sendMessage:async()=>{if(++sends===1)throw new Error('Could not establish connection. Receiving end does not exist.');return {ok:true};}},scripting:{executeScript:async options=>{injections++;assert.deepEqual(options.files,['core/annotations.js','site.js']);}}};

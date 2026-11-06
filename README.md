@@ -1,6 +1,6 @@
 # Evren Etiketleme Aracı
 
-[Kerem](https://github.com/keremtrgl) · [Hugging Face](https://huggingface.co/KeremTT) · v0.5.0 beta.1
+[Kerem](https://github.com/keremtrgl) · [Hugging Face](https://huggingface.co/KeremTT) · v0.5.1 beta.1
 
 Evren'de açık fotoğrafı bilgisayarındaki modellerle inceleyen Chrome uzantısı. Kaç görsel üzerinde çalışacağını ve en yüksek hızı seçebilirsin. Yeterli uzman uzlaşması ve sınıf eşlemesi varsa kutuları Evren'in normal çizim aracıyla çizer, normal kayıt adımını bekler ve sonraki görsele geçer. Emin olamadıklarını incelemeye ayırır.
 
@@ -8,9 +8,17 @@ Evren'de açık fotoğrafı bilgisayarındaki modellerle inceleyen Chrome uzant�
 
 Bu sürüm beta. Uygulama testlerinde iki görsel için çizim, kayıt ve geçiş sırası doğrulandı. Evren'de normal Kutu aracıyla çizilen bir kutunun sayfa yenilendikten sonra kaldığı da kontrol edildi. **Yeni uzantının kurulu Chrome'daki otomatik akışı henüz uçtan uca doğrulanmadı.** Önce küçük bir deneme yap. Test ayrıntıları [doğrulama notunda](docs/validation-v050.md).
 
+## v0.5.1 bağlantı düzeltmesi
+
+Etiket ekranı açıkken görünen ‘Evren etiketleme sekmesini aç’ hatasının bir nedeni düzeltildi: yan panel geçici activeTab iznini almamışsa Chrome sekmenin adresini gizliyordu. Uzantıya yalnız https://evren.ssyz.org.tr/ için site erişimi eklendi. İzin kullanıcı tarafından kapatılmışsa artık site erişimi hatası gösterilir. Geniş tabs izni veya tüm sitelere erişim istenmez. Ücretli API ve ağ kuralları değişmedi.
+
+Mevcut kurulum klasörüne güncelleme yaptıysan Chrome Uzantılar ekranında kartın yenile düğmesine bas, v0.5.1 olduğunu kontrol et, ardından Evren sekmesini yenile. Chrome yeni Evren site erişimini sorarsa bu izin etiketleme ekranını okuyup normal araçla çizmek içindir.
+
+59 test, sözdizimi ve üretim derlemesi geçti. Kurulu Chrome’da hata düzeltmesinin canlı doğrulaması ayrıca bekliyor.
+
 ## Kurulum
 
-1. [Sürümler](https://github.com/keremtrgl/evrenetiketlemearaci/releases) bölümünden **v0.5.0-beta.1** hazır ZIP paketini indir.
+1. [Sürümler](https://github.com/keremtrgl/evrenetiketlemearaci/releases) bölümünden **v0.5.1-beta.1** hazır ZIP paketini indir.
 2. ZIP'e sağ tıkla ve **Tümünü ayıkla** de. İçinde `manifest.json` bulunan klasörü bul.
 3. Chrome adres çubuğuna `chrome://extensions` yaz. Sağ üstten **Geliştirici modu**nu aç.
 4. **Paketlenmemiş öğe yükle** düğmesine basıp bu klasörü seç.

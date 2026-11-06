@@ -87,7 +87,7 @@ $('mapping-save').onclick=async()=>{
   try{const next={...mappings,[label]:name};await writeMappings(context.source.path,next);if(siteContext?.source?.path!==context.source.path)throw new Error('Veri seti değişti');mappings=next;mappingsPath=context.source.path;$('mapping-state').textContent=label+' → '+name+' eşlemesi hatırlandı.';renderSite();}
   catch{status('Eşleme kaydedilemedi; otomatik çalışma başlatılmadı.',true);}
 };
-$('diagnostic').onclick=()=>download('evren-tani-raporu.json',JSON.stringify(S.diagnostic({version:'0.5.0',context:siteContext,item:active(),experts,busy}),null,2));
+$('diagnostic').onclick=()=>download('evren-tani-raporu.json',JSON.stringify(S.diagnostic({version:'0.5.1',context:siteContext,item:active(),experts,busy}),null,2));
 function renderBank(){
   $('model-bank').replaceChildren();
   for(const expert of experts){

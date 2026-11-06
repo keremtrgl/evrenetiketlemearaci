@@ -4,8 +4,10 @@
     function checkpoint(signal){if(signal?.aborted){const error=new Error('Durduruldu; yeni istek gönderilmedi');error.attempted=false;throw error;}}
     async function request(tabId,message,options={}){
       checkpoint(options.signal);
-      const tab=await chrome.tabs.get(tabId);let url;try{url=new URL(tab.url);}catch{throw new Error('Evren etiketleme sekmesini aç');}
+      const tab=await chrome.tabs.get(tabId);
       checkpoint(options.signal);
+      if(!tab.url)throw new Error('Chrome site erişimi kapalı veya geçici izin bitmiş. Uzantının Evren site erişimini açıp Evren sekmesini yenile.');
+      let url;try{url=new URL(tab.url);}catch{throw new Error('Sekme adresi okunamadı; Evren sekmesini yenile');}
       if(url.origin!=='https://evren.ssyz.org.tr'||!url.pathname.startsWith('/annotate/'))throw new Error('Evren etiketleme sekmesini aç');
       try{return await chrome.tabs.sendMessage(tabId,message);}
       catch(error){
