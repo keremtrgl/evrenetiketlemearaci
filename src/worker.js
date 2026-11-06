@@ -11,6 +11,7 @@ globalThis.fetch=(input,options={})=>{
   return nativeFetch(input,options);
 };
 env.allowLocalModels=false;
+env.useWasmCache=false;
 env.backends.onnx.wasm.wasmPaths=new URL('../vendor/',import.meta.url).href;
 env.backends.onnx.wasm.numThreads=1;
 env.backends.onnx.wasm.proxy=false;
@@ -33,7 +34,7 @@ self.onmessage=async({data:m})=>{
       if(!Number.isInteger(m.size)||m.size<32||m.size>1024) throw new Error('Giriş boyutu 32–1024 arasında olmalı');
       const session=await ort.InferenceSession.create(m.buffer,{executionProviders:['wasm']});
       const shape=session.inputMetadata[0]?.shape;
-      if(session.inputNames.length!==1||!shape||shape.length!==4||shape[1]!==3||((typeof shape[2]==='number')&&shape[2]!==m.size)||((typeof shape[3]==='number')&&shape[3]!==m.size)){
+      if(session.inputNames.length!==1||!shape||shape.length!==4||session.inputMetadata[0]?.type!=='float32'||((typeof shape[0]==='number')&&shape[0]!==1)||shape[1]!==3||((typeof shape[2]==='number')&&shape[2]!==m.size)||((typeof shape[3]==='number')&&shape[3]!==m.size)){
         await session.release();throw new Error('Model NCHW RGB girişine ve seçilen boyuta uygun değil');
       }
       const out=session.outputMetadata[0]?.shape;

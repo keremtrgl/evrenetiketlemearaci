@@ -4,6 +4,7 @@ const canvas=$('canvas'),ctx=canvas.getContext('2d');
 let items=[],current=-1,bitmap=null,selected=null,tool='select',draft=[],drag=null,zoom=0,busy=false,stopped=false,worker=null,sequence=0,ownReady=false;
 const calls=new Map();
 let dbPromise;
+let openRequest=0;
 function db(){
   if(!dbPromise) dbPromise=new Promise((resolve,reject)=>{
     const request=indexedDB.open('kerem-local-labels-v1',1);
@@ -102,16 +103,16 @@ function draw(){
 }
 async function open(index){
   if(index<0||index>=items.length)return;
-  const item=items[index];current=index;selected=null;draft=[];drag=null;zoom=0;
+  const request=++openRequest,item=items[index];
   const data=await imageData(item);const blob=await(await fetch(data)).blob();const nextBitmap=await createImageBitmap(blob);
-  if(current!==index){nextBitmap.close();return;}
+  if(request!==openRequest){nextBitmap.close();return;}
   if(nextBitmap.width*nextBitmap.height>25000000){nextBitmap.close();throw new Error('Görsel 25 megapikselden büyük. Önce küçültün.');}
-  bitmap?.close();bitmap=nextBitmap;
-  item.width=bitmap.width;item.height=bitmap.height;
+  item.width=nextBitmap.width;item.height=nextBitmap.height;
   if(!item.restored){
     try{const stored=await getDraft(item.id);if(stored && stored.width===item.width && stored.height===item.height){item.annotations=stored.annotations.filter(a=>{try{return !!A.validate(a);}catch{return false;}});status('Yerel etiket taslağı geri yüklendi.');}}catch{status('Yerel kayıt okunamadı; çalışmaya devam edebilirsin.',true);}item.restored=true;
   }
-  if(active()!==item)return;
+  if(request!==openRequest){nextBitmap.close();return;}
+  current=index;bitmap?.close();bitmap=nextBitmap;selected=null;draft=[];drag=null;zoom=0;
   canvas.width=bitmap.width;canvas.height=bitmap.height;canvas.hidden=false;$('empty').hidden=true;$('image-name').textContent=item.name;
   $('image-info').textContent=`${item.width} × ${item.height} · `+(item.coordinateSpace==='rendered-image'?'Evren tuvali — özgün boyutları kontrol et':'Özgün dosya');
   renderQueue();renderAnnotations();updateClasses();fit();draw();$('species').replaceChildren();
@@ -238,7 +239,11 @@ $('classify').onclick=async()=>{
     const input=await dataURL(await resultCanvas.convertToBlob({type:'image/png'}));const result=await run('CLASSIFY',{image:input});$('species').replaceChildren();
     for(const prediction of result.results){const b=document.createElement('button');b.textContent=prediction.label+' · %'+(prediction.score*100).toFixed(1);b.onclick=()=>{
       if(active()!==item||busy)return;$('class-name').value=prediction.label;
-      if(target){snapshot();target.label=prediction.label;target.reviewed=false;changed();status('Seçili etiketin sınıfı değiştirildi; sınırlarını tekrar incele.');}else status('Tür önerisi seçildi. Yeni çizim bu sınıfla oluşturulacak.');
+      if(target){
+        const currentTarget=item.annotations.find(a=>a.id===target.id);
+        if(!currentTarget){status('Önerinin hedef etiketi artık yok. Bir etiket seçip yeniden tür önerisi al.',true);return;}
+        snapshot();currentTarget.label=prediction.label;currentTarget.reviewed=false;changed();status('Seçili etiketin sınıfı değiştirildi; sınırlarını tekrar incele.');
+      }else status('Tür önerisi seçildi. Yeni çizim bu sınıfla oluşturulacak.');
     };$('species').append(b);}
     $('own-status').textContent=(target?'Seçili nesne':'Tüm görsel')+' · merkez kare kırpma · ilk 5 öneri';
   }catch(e){status(e.message,true);}finally{setBusy(false);}

@@ -14,7 +14,7 @@ const root=path.resolve(__dirname,'..');
   for(const [name,file] of [['Transformers.js','node_modules/@huggingface/transformers/LICENSE'],['ONNX Runtime','third-party/ONNXRUNTIME-LICENSE.txt'],['Hugging Face Jinja','node_modules/@huggingface/jinja/LICENSE'],['Hugging Face Tokenizers','node_modules/@huggingface/tokenizers/LICENSE']]){
     if(fs.existsSync(path.join(root,file)))notices+=name+'\n'+fs.readFileSync(path.join(root,file),'utf8')+'\n\n';
   }
-  fs.writeFileSync(path.join(root,'THIRD_PARTY_NOTICES.txt'),notices);
+  fs.writeFileSync(path.join(root,'THIRD_PARTY_NOTICES.txt'),notices.trimEnd()+'\n');
   const destination=path.join(root,'release');fs.mkdirSync(destination,{recursive:true});
   for(const file of ['manifest.json','app.html','app.css','background.js','site.js','README.md','THIRD_PARTY_NOTICES.txt'])fs.copyFileSync(path.join(root,file),path.join(destination,file));
   for(const directory of ['core','dist','vendor'])fs.cpSync(path.join(root,directory),path.join(destination,directory),{recursive:true});

@@ -10,7 +10,7 @@
     "url": "https://github.com/keremtrgl/evrenetiketlemearaci.git"
   },
   "scripts": {
-    "test": "node --test tests/annotations.test.cjs tests/classifier.test.cjs tests/safe-site.test.cjs tests/safe-network.test.cjs",
+    "test": "node --test tests/annotations.test.cjs tests/classifier.test.cjs tests/safe-site.test.cjs tests/safe-network.test.cjs tests/editor.test.cjs",
     "check": "node --check site.js && node --check background.js && node --check src/app.js && node --check core/annotations.js && node --check core/classifier.js",
     "build": "node scripts/build.cjs"
   },
