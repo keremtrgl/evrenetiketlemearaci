@@ -15,8 +15,16 @@ const root=path.resolve(__dirname,'..');
     if(fs.existsSync(path.join(root,file)))notices+=name+'\n'+fs.readFileSync(path.join(root,file),'utf8')+'\n\n';
   }
   fs.writeFileSync(path.join(root,'THIRD_PARTY_NOTICES.txt'),notices.trimEnd()+'\n');
-  const destination=path.join(root,'release');fs.mkdirSync(destination,{recursive:true});
+  const destination=path.join(root,'release');
+  if(fs.existsSync(destination)){
+    const resolved=fs.realpathSync(destination),expected=path.join(fs.realpathSync(root),'release');
+    if(resolved!==expected||fs.lstatSync(destination).isSymbolicLink())throw new Error('Kurulum çıktısı proje klasörü dışında');
+    fs.rmSync(resolved,{recursive:true,force:true});
+  }
+  fs.mkdirSync(destination,{recursive:true});
   for(const file of ['manifest.json','app.html','app.css','background.js','site.js','README.md','THIRD_PARTY_NOTICES.txt'])fs.copyFileSync(path.join(root,file),path.join(destination,file));
   for(const directory of ['core','dist','vendor'])fs.cpSync(path.join(root,directory),path.join(destination,directory),{recursive:true});
+  fs.mkdirSync(path.join(destination,'docs'),{recursive:true});
+  for(const file of ['validation-v040.md','model-toplulugu.md'])fs.copyFileSync(path.join(root,'docs',file),path.join(destination,'docs',file));
   console.log('Kurulum paketi hazır: '+destination);
 })().catch(error=>{console.error(error);process.exitCode=1;});
